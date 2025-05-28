@@ -10,6 +10,7 @@ source("R/one_run.R")
 
 library("np")
 library("plotly")
+dir.create("output", showWarnings = FALSE, recursive = TRUE)
 
 # 单次运行示例
 res_example <- one_run(K_default, n_ave_default, m_default, sd = 1)
