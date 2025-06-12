@@ -34,4 +34,8 @@ for (K in K_s) {
 
 res_df <- do.call(cbind, res)
 print("=== 平均误差汇总 ===")
+res_df <- do.call(cbind, res)
+
+# 添加误差类型行名
+rownames(res_df) <- c("err_m", "err_G", "err_lams", "err_PCs", "err_mu")
 print(round(res_df, 4))
