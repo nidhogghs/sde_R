@@ -60,16 +60,17 @@ cat(sprintf("[Step 5] Done: range = [%.4f, %.4f]\n",
 sigma2_true_k <- sigma[2:(m+1), 1]^2
 cat("[Step 6] True sigma²_k(t) computed.\n")
 
-# Step 7: Plotting --------------------------------------------------------
-cat("[Step 7] Plotting estimated vs. true sigma²_k(t)...\n")
+# Step 7: Plot and save to file
+png("output/sigma2_est_vs_true.png", width = 800, height = 600)
 plot(ts, sigma2_hat_k, type = "l", col = "blue", lwd = 2,
      ylim = range(c(sigma2_hat_k, sigma2_true_k)),
      main = expression(hat(sigma)^2(t)~vs.~sigma[true]^2(t)),
      xlab = "t", ylab = expression(sigma^2(t)))
 lines(ts, sigma2_true_k, col = "black", lty = 3, lwd = 2)
-legend("topright", legend = c("Estimated", "True"),
+legend("topright", legend = c("Estimate", "True"),
        col = c("blue", "black"), lty = c(1, 3), lwd = 2)
-cat("[Step 7] Plot finished.\n")
+dev.off()
+
 
 # Step 8: Compute RMSE ----------------------------------------------------
 rmse <- sqrt(mean((sigma2_hat_k - sigma2_true_k)^2))
