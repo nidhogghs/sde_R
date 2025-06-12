@@ -1,4 +1,3 @@
-# main.R
 # ========= 模拟主程序入口 =========
 
 source("config.R")
@@ -12,30 +11,47 @@ library("np")
 library("plotly")
 dir.create("output", showWarnings = FALSE, recursive = TRUE)
 
-# 单次运行示例
-res_example <- one_run(K_default, n_ave_default, m_default, sd = 1)
+run_main <- function(K = NULL, n_ave = NULL, Nsim_local = NULL, m = NULL) {
+  if (is.null(K)) K <- K_grid[1]
+  if (is.null(n_ave)) n_ave <- n_ave_grid[1]
+  if (is.null(Nsim_local)) Nsim_local <- Nsim
+  if (is.null(m)) m <- m_default
 
-# 多次仿真，统计误差均值
-K_s <- K_grid
-n_aves <- n_ave_grid
+  res <- list()
+  cat("Running K =", K, "n_ave =", n_ave, "\n")
+  res_N <- sapply(1:Nsim_local, function(sd) {
+    cat("  Simulation:", sd, "\n")
+    one_run(K, n_ave, m, sd)
+  })
+  res_mean <- rowMeans(res_N)
+  res[[paste0("K", K, "_n", n_ave)]] <- res_mean
 
-res <- list()
-for (K in K_s) {
-  for (n_ave in n_aves) {
-    cat("Running K =", K, "n_ave =", n_ave, "\n")
-    res_N <- sapply(1:Nsim, function(sd) {
-      cat("  Simulation:", sd, "\n")
-      one_run(K, n_ave, m_default, sd)
-    })
-    res_mean <- rowMeans(res_N)
-    res[[paste0("K", K, "_n", n_ave)]] <- res_mean
+  res_df <- do.call(cbind, res)
+  rownames(res_df) <- c("err_m", "err_G", "err_lams", "err_PCs", "err_mu")
+  print("=== 平均误差汇总 ===")
+  print(round(res_df, 4))
+}
+
+
+# ========== 自动执行逻辑 ==========
+
+# 从命令行提取参数（Rscript 方式）
+args <- commandArgs(trailingOnly = TRUE)
+args_list <- list()
+if (length(args) > 0) {
+  for (arg in args) {
+    kv <- strsplit(arg, "=")[[1]]
+    key <- kv[1]
+    value <- as.numeric(kv[2])
+    args_list[[key]] <- value
   }
 }
 
-res_df <- do.call(cbind, res)
-print("=== 平均误差汇总 ===")
-res_df <- do.call(cbind, res)
-
-# 添加误差类型行名
-rownames(res_df) <- c("err_m", "err_G", "err_lams", "err_PCs", "err_mu")
-print(round(res_df, 4))
+# 判断当前运行环境
+if (sys.nframe() == 0) {
+  if (length(args_list) > 0) {
+    do.call(run_main, args_list)  # 有命令行参数时
+  } else {
+    run_main()                    # 无参数，使用 config 默认值
+  }
+}
