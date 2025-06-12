@@ -51,3 +51,12 @@ variation <- function(X, m){
   y <- apply(X, 2, diff) / sqrt(Delta)
   return(y)
 }
+
+# 新增函数：直接生成 V_k(t)，然后取 exp 得到 σ²_k(t)
+generate_V_and_sigma2 <- function(...) {
+  V <- generate_K_trajectory(...)        # 先生成 V_k(t)
+  V <- V - max(V)                        # 在 log σ² 层归一化
+  sigma2 <- exp(V)                       # 得到 σ²_k(t)
+  sigma <- sqrt(sigma2)                  # 得到 σ_k(t)
+  return(list(sigma = sigma, sigma2 = sigma2, V = V))  #  保留原始 V
+}

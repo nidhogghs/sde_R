@@ -25,55 +25,50 @@ estimate_G_mu <- function(Z_Delta, m_mu_hat, m, K, h_min = 0.021){
   return(matrix(G_hat, m, m))
 }
 
-#' Estimate σ²_k(t) via Müller (2011) within-process method
+#' Estimate σ²_k(t) using Müller (2011) — cross-process smoothing, within-process recovery
 #'
-#' @param Z_k matrix [m × n_k] of Δlog X for class k
+#' @param Y_all [m × N] matrix: all Y_{ij} = log(Z²) - q0
+#' @param Y_k [m × n_k] matrix: only kth process Y
 #' @param ts vector of time points
 #' @param L number of FPCA components
-#' @param q0 constant E[log(W²)] ~ -1.270
-#' @return vector of σ²_k(t) over ts
-#' @export
-estimate_sigma2_k <- function(Z_k, ts, L = 3, q0 = -1.270, h_min = 0.021) {
-  m <- nrow(Z_k)
-  n_k <- ncol(Z_k)
-  
-  # Step 1: log(Z²) - q0
-  Y_k <- log(Z_k^2) - q0
-  
-  # Step 2: μ_V(t)
-  Y_vec <- as.vector(Y_k)
-  t_vec <- rep(ts, n_k)
-  df_mu <- data.frame(t = t_vec, y = Y_vec)
-  fit_mu <- npreg(y ~ t, data = df_mu, regtype = "ll", bwmethod = "cv.aic")
+#' @param q0 E[log(W²)] ~ -1.270
+#' @return vector of σ²_k(t)
+estimate_sigma2_Muller <- function(Y_all, Y_k, ts, L = 3, q0 = -1.270, h_min = 0.021) {
+  m <- nrow(Y_all)
+  N <- ncol(Y_all)
+
+  ## Step 1: Estimate μ_V(t) from all Y_{ij}
+  Y_bar <- rowMeans(Y_all)             
+  fit_mu <- npreg(Y ~ t, data = data.frame(t = ts, Y = Y_bar), regtype = "ll", bwmethod = "cv.aic")
   mu_V <- predict(fit_mu, newdata = data.frame(t = ts))
-  
-  # # Step 3: G_V(s,t)
-  # Y_centered <- Y_k - matrix(mu_V, m, n_k, byrow = FALSE)
-  # raw_cov <- Y_centered %*% t(Y_centered) / n_k
-  # coor1 <- rep(1:m, m) / m
-  # coor2 <- rep(1:m, each = m) / m
-  # idx_diag <- which(coor1 == coor2)
-  # df_cov <- data.frame(
-  #   Y = as.vector(raw_cov)[-idx_diag],
-  #   X1 = coor1[-idx_diag],
-  #   X2 = coor2[-idx_diag]
-  # )
-  # h <- max((n_k * m)^(-1/3), h_min)
-  # fit_cov <- npreg(Y ~ X1 + X2, data = df_cov, regtype = "ll", bws = c(h, h) * 0.2)
-  # G_V <- matrix(predict(fit_cov, newdata = data.frame(X1 = coor1, X2 = coor2)), m, m)
-  
-  # # Step 4: FPCA
-  # eig <- eigen(G_V, symmetric = TRUE)
-  # phi_list <- lapply(1:L, function(i) Re(eig$vectors[, i]) * sqrt(m))
-  
-  # Step 5: Reconstruct V_k(t)
+
+  mu_V <- predict(fit_mu, newdata = data.frame(t = ts))
+
+  ## Step 2: Estimate G_V(s, t)
+  Y_centered <- Y_all - matrix(mu_V, m, N, byrow = FALSE)
+  raw_cov <- Y_centered %*% t(Y_centered) / N
+  coor1 <- rep(1:m, m) / m
+  coor2 <- rep(1:m, each = m) / m
+  idx_diag <- which(coor1 == coor2)
+  data_cov <- data.frame(Y = as.vector(raw_cov)[-idx_diag], X1 = coor1[-idx_diag], X2 = coor2[-idx_diag])
+  h <- max((N * m)^(-1/3), h_min)
+  fit_cov <- npreg(Y ~ X1 + X2, data = data_cov, regtype = "ll", bws = c(h, h) * 0.2)
+  G_V <- matrix(predict(fit_cov, newdata = data.frame(X1 = coor1, X2 = coor2)), m, m)
+
+  ## Step 3: FPCA
+  eig <- eigen(G_V, symmetric = TRUE)
+  phi_list <- lapply(1:L, function(i) Re(eig$vectors[, i]) * sqrt(m))
+
+  ## Step 4: Project kth process onto eigenbasis
+  Y_bar_k <- rowMeans(Y_k)
   V_k <- mu_V
-  # for (l in 1:L) {
-  #   xi_hat <- mean(rowMeans(Y_k) * phi_list[[l]])
-  #   V_k <- V_k + xi_hat * phi_list[[l]]
-  # }
-  
-  # Step 6: Return σ²_k(t)
+  for (l in 1:L) {
+    phi_l <- phi_list[[l]]
+    xi_hat <- mean(Y_bar_k * phi_l)
+    V_k <- V_k + xi_hat * phi_l
+  }
+
+  ## Step 5: Return exp(V_k)
   return(exp(V_k))
 }
 

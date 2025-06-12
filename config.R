@@ -15,11 +15,12 @@ b <- 1.5
 beta <- 1
 l <- 4
 
-# 默认仿真设置
-K_default <- 500
-n_ave_default <- 300
-m_default <- 50
-Nsim <- 10
+# Default simulation grids
+K_grid <- c(100, 300, 500)        # 样本规模列表
+n_ave_grid <- c(100, 300)         # 每条曲线的观测数列表
+m_default <- 50                   # 默认时间网格数
+Nsim <- 10                        # 仿真重复次数
+h_min <- 0.021                    # 核带宽下限
 
 # 最小核带宽（用于二维协方差估计）
 h_min <- 0.021

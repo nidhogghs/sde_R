@@ -11,7 +11,7 @@ cat("===== TEST SCRIPT START: Estimating sigma²_k(t) =====\n")
 args <- commandArgs(trailingOnly = TRUE)
 
 # Default values
-K <- 1
+K <- 300
 n_ave <- 300
 m <- 50
 
@@ -19,46 +19,55 @@ m <- 50
 for (arg in args) {
   eval(parse(text = arg))
 }
-cat(sprintf("[Step 1] Parameter setup: K = %d, n_ave = %d, m = %d\n", K, n_ave, m))
+
 
 delta <- T / m
 ts <- seq(delta, T, length.out = m)
 n_vec <- rep(n_ave, K)
 
 # Step 2: Simulate sigma and mu ------------------------------------------
-cat("[Step 2] Simulating sigma_k(t) and mu_k(t)...\n")
+
+
+
 set.seed(456)
-sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)
-sigma <- sigma / max(sigma)  # Normalize
+sigma_res <- generate_V_and_sigma2(K, a, delta, alpha, k, m)
+sigma  <- sigma_res$sigma        # 已归一化
+sigma2 <- sigma_res$sigma2
+V_true <- sigma_res$V
 
 set.seed(789)
 mu <- generate_K_trajectory(K, b, delta, beta, l, m)
-cat(sprintf("[Step 2] Done: dim(sigma) = [%d x %d], dim(mu) = [%d x %d]\n",
-            nrow(sigma), ncol(sigma), nrow(mu), ncol(mu)))
+
+
 
 # Step 3: Simulate X and compute log-differences --------------------------
-cat("[Step 3] Generating X and computing Δlog X...\n")
+
 set.seed(1)
 X <- generate_n_X(n_vec, sigma, mu, X0)
 logX <- log(X)
-Z_Delta_raw <- variation(logX, m) * sqrt(delta)
-cat(sprintf("[Step 3] Done: dim(X) = [%d x %d], dim(Z_Delta) = [%d x %d]\n",
-            nrow(X), ncol(X), nrow(Z_Delta_raw), ncol(Z_Delta_raw)))
+X_Delta <- variation(logX, m)
+
+
+
 
 # Step 4: Extract data for class k = 1 ------------------------------------
-cat("[Step 4] Extracting data for class k = 1...\n")
-Z_k <- Z_Delta_raw[, 1:n_ave]
-cat(sprintf("[Step 4] Done: dim(Z_k) = [%d x %d]\n", nrow(Z_k), ncol(Z_k)))
+
+Z_Delta <- cluster_mean(X_Delta, K, n_vec) / sqrt(delta)  # dim = [m × K]
+epsilon <- 1e-8
+Z_Delta[abs(Z_Delta) < epsilon | is.na(Z_Delta) | is.infinite(Z_Delta)] <- epsilon
+
+q0 <- -1.270
+Y_all <- log(Z_Delta^2) - q0
+Y_k <- Y_all[, 1, drop = FALSE]  # 提取第 1 个 process，确保为矩阵形式
 
 # Step 5: Estimate sigma²_k(t) --------------------------------------------
-cat("[Step 5] Estimating sigma²_k(t)...\n")
-sigma2_hat_k <- estimate_sigma2_k(Z_k, ts, L = 3)
-cat(sprintf("[Step 5] Done: range = [%.4f, %.4f]\n", 
-            min(sigma2_hat_k), max(sigma2_hat_k)))
 
-# Step 6: Get true sigma²_k(t) --------------------------------------------
-sigma2_true_k <- sigma[2:(m+1), 1]^2
-cat("[Step 6] True sigma²_k(t) computed.\n")
+
+sigma2_hat_k <- estimate_sigma2_Muller(Y_all, Y_k, ts, L = 3)
+
+# Step 6: Get true sigma²_k(t) from V_true
+V_true_k <- V_true[2:(m+1), 1]           # log σ²_k(t)
+sigma2_true_k <- exp(V_true_k)
 
 # Step 7: Plot and save to file
 png("output/sigma2_est_vs_true.png", width = 800, height = 600)
