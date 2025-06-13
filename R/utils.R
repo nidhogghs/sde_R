@@ -62,3 +62,32 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 10) {
   # 返回使 AIC 最小的 L
   return(which.min(aic_values))
 }
+
+
+
+plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
+  if (is.vector(true_mat)) true_mat <- matrix(true_mat, ncol = 1)
+  if (is.vector(est_mat))  est_mat  <- matrix(est_mat,  ncol = 1)
+
+  df <- data.frame(
+    t = ts,
+    True = true_mat[, k],
+    Estimate = est_mat[, k]
+  )
+  df_melt <- reshape2::melt(df, id.vars = "t", variable.name = "Type", value.name = "Value")
+
+  p <- ggplot(df_melt, aes(x = t, y = Value, color = Type)) +
+    geom_line(linewidth = 1) +
+    labs(title = sprintf("Comparison of %s: True vs Estimated (k = %d)", label, k),
+         x = "t", y = label) +
+    theme_minimal()
+
+  print(p)  # 显示图像
+}
+
+
+
+compute_qk <- function(nk) {
+  digamma(nk / 2) + log(2) - nk
+}
+# 计算 q0 的值

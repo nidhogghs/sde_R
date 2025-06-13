@@ -20,11 +20,14 @@ generate_one_trajectory <- function(a, delta, alpha, k, N){
   return(a + part1 + alpha * part2)
 }
 
-generate_K_trajectory <- function(n, a, delta, alpha, k, N){
-  sapply(1:n, function(i) generate_one_trajectory(a, delta, alpha, k, N))
+
+
+#返回值N+1*K的矩阵
+generate_K_trajectory <- function(K, a, delta, alpha, k, N){
+  sapply(1:K, function(i) generate_one_trajectory(a, delta, alpha, k, N))
 }
 
-generate_n_X <- function(n, sigma, mu, X0){
+generate_n_X <- function(n, sigma, mu, X0){#矩阵，维度为 (m+1) × ∑ n_k
   K <- ncol(sigma)
   m <- nrow(sigma) - 1
   Delta <- T / m
@@ -54,9 +57,12 @@ variation <- function(X, m){
 
 # 新增函数：直接生成 V_k(t)，然后取 exp 得到 σ²_k(t)
 generate_V_and_sigma2 <- function(...) {
-  V <- generate_K_trajectory(...)        # 先生成 V_k(t)
-  V <- V - max(V)                        # 在 log σ² 层归一化
-  sigma2 <- exp(V)                       # 得到 σ²_k(t)
-  sigma <- sqrt(sigma2)                  # 得到 σ_k(t)
-  return(list(sigma = sigma, sigma2 = sigma2, V = V))  #  保留原始 V
+  V <- generate_K_trajectory(...)  # 原始 log σ²_k(t)
+  V_min <- min(V)
+  V_max <- max(V)
+  V_scaled <- 4 * (V - V_min) / (V_max - V_min) - 2   # 缩放至 [-2, 2]
+
+  sigma2 <- exp(V_scaled)
+  sigma <- sqrt(sigma2)
+  return(list(sigma = sigma, sigma2 = sigma2, V = V_scaled))
 }

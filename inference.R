@@ -4,6 +4,8 @@ source("R/estimation.R")
 source("R/recovery.R")
 source("R/utils.R")
 library(np)
+library(ggplot2)
+library(reshape2)
 
 cat("===== TEST SCRIPT START: Estimating sigma²_k(t) =====\n")
 
@@ -14,7 +16,7 @@ args <- commandArgs(trailingOnly = TRUE)
 K <- 300
 n_ave <- 300
 m <- 50
-
+L <- 4
 # Parse CLI arguments like "K=50"
 for (arg in args) {
   eval(parse(text = arg))
@@ -22,67 +24,74 @@ for (arg in args) {
 
 
 delta <- T / m
-ts <- seq(delta, T, length.out = m)
+ts <- seq(delta, T, length.out = m)  #时间间隔网
+
+
 n_vec <- rep(n_ave, K)
-
-# Step 2: Simulate sigma and mu ------------------------------------------
-
+# q0 <- compute_qk(n_ave)
+# cat(sprintf("q0 = %f\n", q0))
+q0 <- -1.270  # 预设 q0 值，通常为 E[log(W²)] 的估计值
+# 2. 生成观测轨迹 ------------------------------------------
 
 
 set.seed(456)
-sigma_res <- generate_V_and_sigma2(K, a, delta, alpha, k, m)
-sigma  <- sigma_res$sigma        # 已归一化
-sigma2 <- sigma_res$sigma2
-V_true <- sigma_res$V
+sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)#m+1* K 矩阵
+sigma <- sigma / max(sigma)  # 确保最大值为 1
+sigma2 <- sigma^2 # m × K 矩阵，所有curve的sigma²_k(t)
+V_true <- log(sigma2) # m × K 矩阵，所有curve的V_k(t)
+
+
+m_V_true_value <- rowMeans(V_true)[-1]        # m × 1 向量值为估计值
+G_V_true_value <- (V_true[-1, ] - m_V_true_value) %*% t(V_true[-1, ] - m_V_true_value) / K # m × m 矩阵
+PCs_true <- Re(eigen(G_V_true_value)$vectors) * sqrt(m) # m × m 矩阵.主成分离散点值
+lams_true <- Re(eigen(G_V_true_value)$values) / m # m × 1 向量.主成分贡献
+sigma2_true <- exp(V_true)[-1, ] # m × K 矩阵，所有curve的sigma²_k(t)
+sigma_true <- sqrt(sigma2_true) # m × K 矩阵，所有curve的sigma_k(t)
 
 set.seed(789)
 mu <- generate_K_trajectory(K, b, delta, beta, l, m)
 
-
-
-# Step 3: Simulate X and compute log-differences --------------------------
-
 set.seed(1)
 X <- generate_n_X(n_vec, sigma, mu, X0)
-logX <- log(X)
-X_Delta <- variation(logX, m)
+
+# 3. 标准化差分数据
+X_Delta <- variation(log(X), m) #差分 得到m*sum(n_vec)矩阵
 
 
 
 
-# Step 4: Extract data for class k = 1 ------------------------------------
 
-Z_Delta <- cluster_mean(X_Delta, K, n_vec) / sqrt(delta)  # dim = [m × K]
-epsilon <- 1e-8
-Z_Delta[abs(Z_Delta) < epsilon | is.na(Z_Delta) | is.infinite(Z_Delta)] <- epsilon
+Y_all <-construct_Y(X_Delta, n_vec, q0)  # m × K 矩阵
 
-q0 <- -1.270
-Y_all <- log(Z_Delta^2) - q0
-Y_k <- Y_all[, 1, drop = FALSE]  # 提取第 1 个 process，确保为矩阵形式
+# 4. 估计 m_mu 与 G_mu
+m_V_hat <- estimate_m_mu(Y_all, ts) # m × 1 向量值为估计值
+G_V_hat <- estimate_G_mu(Y_all, m_V_hat, m, K, h_min = h_min)  # m × m 矩阵
 
-# Step 5: Estimate sigma²_k(t) --------------------------------------------
+# 5. 主成分分析 (FPCA)
+PCs_hat <- Re(eigen(G_V_hat)$vectors) * sqrt(m)
+lams_hat <- Re(eigen(G_V_hat)$values) / m
 
+# 6.自动选择主成分数 L（若未指定）
+if (is.null(L)) {
+  L <- select_L_by_AIC(Y_all, m_V_hat, PCs_hat, max_L = 10)
+  if (is.na(L)) stop("AIC failed: selected L is NA.")
+  cat(sprintf("Selected L by AIC: %d\n", L))
+} else {
+  cat(sprintf("Using manually specified L: %d\n", L))
+}
 
-sigma2_hat_k <- estimate_sigma2_Muller(Y_all, Y_k, ts, L = 3)
+V_hat <- recover_mu(Y_all, m_V_hat, PCs_hat, L, K)
 
-# Step 6: Get true sigma²_k(t) from V_true
-V_true_k <- V_true[2:(m+1), 1]           # log σ²_k(t)
-sigma2_true_k <- exp(V_true_k)
-
-# Step 7: Plot and save to file
-png("output/sigma2_est_vs_true.png", width = 800, height = 600)
-plot(ts, sigma2_hat_k, type = "l", col = "blue", lwd = 2,
-     ylim = range(c(sigma2_hat_k, sigma2_true_k)),
-     main = expression(hat(sigma)^2(t)~vs.~sigma[true]^2(t)),
-     xlab = "t", ylab = expression(sigma^2(t)))
-lines(ts, sigma2_true_k, col = "black", lty = 3, lwd = 2)
-legend("topright", legend = c("Estimate", "True"),
-       col = c("blue", "black"), lty = c(1, 3), lwd = 2)
-dev.off()
+sigma2_hat <- exp(V_hat) # m × K 矩阵，所有curve的sigma²_k(t)
+sigma_hat <- sqrt(sigma2_hat) # m × K 矩阵，所有curve的sigma_k(t)
 
 
-# Step 8: Compute RMSE ----------------------------------------------------
-rmse <- sqrt(mean((sigma2_hat_k - sigma2_true_k)^2))
-cat(sprintf("[Step 8] RMSE = %.6f\n", rmse))
-cat("===== TEST SCRIPT END =====\n")
+
+
+p1 <- plot_compare_single(ts, m_V_true_value, V_hat, k = 1, label = "V_k(t)")
+ggsave("figures/V_k1.png", plot = p1, width = 6, height = 4)
+
+p2 <- plot_compare_single(ts, sigma2_true, sigma2_hat, k = 1, label = "sigma²_k(t)")
+ggsave("figures/sigma2_k1.png", plot = p2, width = 6, height = 4)
+
 
