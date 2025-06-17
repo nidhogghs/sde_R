@@ -98,3 +98,46 @@ compute_qk_mc <- function(nk, B = 1e6, seed = 123) {
   
   return(qk)
 }
+
+evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval = 1) {
+  stopifnot(dim(V_true) == dim(V_hat))
+  stopifnot(dim(sigma2_true) == dim(sigma2_hat))
+  stopifnot(k_eval >= 1 && k_eval <= ncol(V_true))
+
+  # 所有轨迹的 log σ² 误差
+  err_V_col_max <- apply(abs(V_hat - V_true), 2, max)
+  err_V_max <- max(err_V_col_max)
+  err_V_mean <- mean(err_V_col_max)
+
+  # 第 k_eval 条轨迹：V 和 σ² 的误差
+  V_diff_k <- V_hat[, k_eval] - V_true[, k_eval]
+  sigma2_diff_k <- sigma2_hat[, k_eval] - sigma2_true[, k_eval]
+
+  # 相对误差（已归一化）
+  err_V_k_rel <- max(abs(V_diff_k)) / (max(V_true[, k_eval]) - min(V_true[, k_eval]))
+  err_sigma2_k_rel <- sqrt(mean(sigma2_diff_k^2)) / mean(sigma2_true[, k_eval])
+
+  # 绝对误差（MAE / RMSE）
+  err_sigma2_k_mae <- mean(abs(sigma2_diff_k))
+  err_sigma2_k_rmse <- sqrt(mean(sigma2_diff_k^2))
+
+  # 输出
+  cat("===== Estimation Errors =====\n")
+  cat(sprintf("Max abs error over all V_k(t):     %0.6f\n", err_V_max))
+  cat(sprintf("Mean abs error over all V_k(t):    %0.6f\n", err_V_mean))
+  cat(sprintf("Relative error of V_k(t), k=%d:     %0.6f\n", k_eval, err_V_k_rel))
+  cat(sprintf("Relative error of sigma²_k(t), k=%d:    %0.6f\n", k_eval, err_sigma2_k_rel))
+  cat(sprintf("Absolute MAE  of sigma²_k(t), k=%d:     %0.6f\n", k_eval, err_sigma2_k_mae))
+  cat(sprintf("Absolute RMSE of sigma²_k(t), k=%d:     %0.6f\n", k_eval, err_sigma2_k_rmse))
+
+  # 返回结果
+  return(list(
+    err_V_max = err_V_max,
+    err_V_mean = err_V_mean,
+    err_V_k_rel = err_V_k_rel,
+    err_sigma2_k_rel = err_sigma2_k_rel,
+    err_sigma2_k_mae = err_sigma2_k_mae,
+    err_sigma2_k_rmse = err_sigma2_k_rmse
+  ))
+}
+

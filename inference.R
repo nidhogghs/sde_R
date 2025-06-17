@@ -16,7 +16,7 @@ args <- commandArgs(trailingOnly = TRUE)
 K <- 30
 n_ave <- 300
 m <- 50
-L <- 4
+l <- 4
 for (arg in args) {
   eval(parse(text = arg))
 }
@@ -31,8 +31,8 @@ compute_qk <- function(nk) {
 }
 
 
-# q0 <- compute_qk(n_ave)
-q0 <- compute_qk_mc(n_ave)
+ #q0 <- compute_qk(n_ave)
+ q0 <- compute_qk_mc(n_ave)
 # cat(sprintf("q0 = %f\n", q0))
 
 
@@ -47,7 +47,7 @@ q0 <- compute_qk_mc(n_ave)
 # V_true <- log(sigma2) # m +1× K 矩阵，所有curve的V_k(t)
 
 # Step 1: Generate full V matrix — (m+1) × K
-V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)  # output: (m+1) × K
+V_true <- generate_K_trajectory(K, a, delta, alpha, l, m)  # output: (m+1) × K
 
 # Step 2: Clip V_full elementwise to avoid overflow
 # V_min <- -10
@@ -100,14 +100,13 @@ V_hat <- recover_mu(Y_Delta, m_V_hat, PCs_hat, L, K)
 
 sigma2_hat <- exp(V_hat) # m × K 矩阵，所有curve的sigma²_k(t)
 sigma_hat <- sqrt(sigma2_hat) # m × K 矩阵，所有curve的sigma_k(t)
+# 7. 误差评估
+evaluate_V_estimation(V_true[-1, ], V_hat, sigma2_true, sigma2_hat, k_eval = 2)
 
-
-
-
-p1 <- plot_compare_single(ts, m_V_true_value, V_hat, k = 1, label = "V_k(t)")
-ggsave("figures/V_k1.png", plot = p1, width = 6, height = 4)
+p1 <- plot_compare_single(ts, V_true[-1, ], V_hat, k = 1, label = "V_k(t)")
+ggsave("figures/V_k1.png", plot = p1, width = 6, height = 4, bg = "white")
 
 p2 <- plot_compare_single(ts, sigma2_true, sigma2_hat, k = 1, label = "sigma²_k(t)")
-ggsave("figures/sigma2_k1.png", plot = p2, width = 6, height = 4)
+ggsave("figures/sigma2_k1.png", plot = p2, width = 6, height = 4, bg = "white")
 
 
