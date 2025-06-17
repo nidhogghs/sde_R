@@ -30,7 +30,7 @@ estimate_G_mu <- function(Z_Delta, m_mu_hat, m, K, h_min = 0.021){
 construct_Y <- function(Z_Delta, n_vec, q0) {
   m <- nrow(Z_Delta)
   K <- length(n_vec)
-  Y_all <- matrix(NA, nrow = m, ncol = K)
+  Y_Delta <- matrix(NA, nrow = m, ncol = K)
 
   col_idx <- 1
   for (k in 1:K) {
@@ -41,11 +41,11 @@ construct_Y <- function(Z_Delta, n_vec, q0) {
     Z_sq_sum <- rowSums(Z_k^2)
     Y_k <- log(Z_sq_sum) - log(n_vec[k]) - q0
 
-    Y_all[, k] <- Y_k
+    Y_Delta[, k] <- Y_k
     col_idx <- col_idx + n_vec[k]
   }
 
-  return(Y_all)  # 返回 m × K 的矩阵，每列是 Y_k^Δ(t_j)
+  return(Y_Delta)  # 返回 m × K 的矩阵，每列是 Y_k^Δ(t_j)
 }
 
 

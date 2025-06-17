@@ -85,9 +85,16 @@ plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
   print(p)  # 显示图像
 }
 
-
-
-compute_qk <- function(nk) {
-  digamma(nk / 2) + log(2) - nk
-}
 # 计算 q0 的值
+compute_qk_mc <- function(nk, B = 1e6, seed = 123) {
+  # 设置随机种子以保证可复现
+  set.seed(seed)
+  
+  # 生成 B 个自由度为 nk 的卡方随机变量
+  samples <- rchisq(B, df = nk)
+  
+  # 计算期望 E[log(χ²_nk)] - log(nk)
+  qk <- mean(log(samples)) - log(nk)
+  
+  return(qk)
+}

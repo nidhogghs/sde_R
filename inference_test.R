@@ -13,7 +13,7 @@ cat("===== TEST SCRIPT START: Estimating sigma²_k(t) =====\n")
 args <- commandArgs(trailingOnly = TRUE)
 
 # Default values
-K <- 30
+K <- 300
 n_ave <- 300
 m <- 50
 L <- 4
@@ -31,8 +31,7 @@ compute_qk <- function(nk) {
 }
 
 
-# q0 <- compute_qk(n_ave)
-q0 <- compute_qk_mc(n_ave)
+q0 <- compute_qk(n_ave)
 # cat(sprintf("q0 = %f\n", q0))
 
 
@@ -40,23 +39,12 @@ q0 <- compute_qk_mc(n_ave)
 # 2. 真值生成 ------------------------------------------
 
 
-# set.seed(456)
-# sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)#m+1* K 矩阵
-# sigma <- sigma / max(sigma)  # 确保最大值为 1
-# sigma2 <- sigma^2 # m+1 × K 矩阵，所有curve的sigma²_k(t)
-# V_true <- log(sigma2) # m +1× K 矩阵，所有curve的V_k(t)
+set.seed(456)
+sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)#m+1* K 矩阵
+sigma <- sigma / max(sigma)  # 确保最大值为 1
+sigma2 <- sigma^2 # m × K 矩阵，所有curve的sigma²_k(t)
+V_true <- log(sigma2) # m × K 矩阵，所有curve的V_k(t)
 
-# Step 1: Generate full V matrix — (m+1) × K
-V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)  # output: (m+1) × K
-
-# Step 2: Clip V_full elementwise to avoid overflow
-# V_min <- -10
-# V_max <- 5
-# V_true <- pmin(pmax(V_true, V_min), V_max)  # still (m+1) × K
-
-# Step 3: Compute sigma² and sigma (used in simulation, Z generation)
-sigma2 <- exp(V_true)           # (m+1) × K
-sigma  <- sqrt(sigma2)          # (m+1) × K
 
 m_V_true_value <- rowMeans(V_true)[-1]        # m × 1 向量值为估计值
 G_V_true_value <- (V_true[-1, ] - m_V_true_value) %*% t(V_true[-1, ] - m_V_true_value) / K # m × m 矩阵
