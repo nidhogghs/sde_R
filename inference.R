@@ -16,7 +16,8 @@ args <- commandArgs(trailingOnly = TRUE)
 K <- 30
 n_ave <- 300
 m <- 50
-l <- 4
+l <- 2
+L <- 2
 for (arg in args) {
   eval(parse(text = arg))
 }
@@ -26,37 +27,28 @@ delta <- T / m
 ts <- seq(delta, T, length.out = m)  #时间间隔网
 n_vec <- rep(n_ave, K) #K个过程的观测数为n_ave
 
-compute_qk <- function(nk) {
-  - 1 / (2 * nk) - 1 / (12 * nk^2)
-}
+# compute_qk <- function(nk) {
+#   - 1 / (2 * nk) - 1 / (12 * nk^2)
+# }
 
 
  #q0 <- compute_qk(n_ave)
- q0 <- compute_qk_mc(n_ave)
+ q_vec <- compute_qk_mc(n_vec)
 # cat(sprintf("q0 = %f\n", q0))
-
-
-# q0 <- -1.270  # 预设 q0 值，通常为 E[log(W²)] 的估计值
 # 2. 真值生成 ------------------------------------------
 
-
-# set.seed(456)
-# sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)#m+1* K 矩阵
-# sigma <- sigma / max(sigma)  # 确保最大值为 1
-# sigma2 <- sigma^2 # m+1 × K 矩阵，所有curve的sigma²_k(t)
-# V_true <- log(sigma2) # m +1× K 矩阵，所有curve的V_k(t)
+set.seed(311)
 
 # Step 1: Generate full V matrix — (m+1) × K
 V_true <- generate_K_trajectory(K, a, delta, alpha, l, m)  # output: (m+1) × K
 
-# Step 2: Clip V_full elementwise to avoid overflow
-# V_min <- -10
-# V_max <- 5
-# V_true <- pmin(pmax(V_true, V_min), V_max)  # still (m+1) × K
-
-# Step 3: Compute sigma² and sigma (used in simulation, Z generation)
 sigma2 <- exp(V_true)           # (m+1) × K
 sigma  <- sqrt(sigma2)          # (m+1) × K
+
+# sigma <- generate_K_trajectory(K, a, delta, alpha, l, m)  # output: (m+1) × K
+# sigma2 <- sigma^2
+# V_true <- log(sigma2)
+
 
 m_V_true_value <- rowMeans(V_true)[-1]        # m × 1 向量值为估计值
 G_V_true_value <- (V_true[-1, ] - m_V_true_value) %*% t(V_true[-1, ] - m_V_true_value) / K # m × m 矩阵
@@ -69,15 +61,15 @@ sigma_true <- sqrt(sigma2_true) # m × K 矩阵，所有curve的sigma_k(t)
 
 
 # 生成漂移轨迹
-set.seed(789)
+set.seed(311)
 mu <- generate_K_trajectory(K, b, delta, beta, l, m)
 
-set.seed(1)
+set.seed(61)
 X <- generate_n_X(n_vec, sigma, mu, X0)
 
 # 3. 标准化差分数据
 X_Delta <- variation(log(X), m) #差分 得到m*sum(n_vec)矩阵
-Y_Delta <-construct_Y(X_Delta, n_vec, q0)  # m × K 矩阵
+Y_Delta <-construct_Y(X_Delta, n_vec, q_vec)  # m × K 矩阵
 
 # 4. 估计 m_mu 与 G_mu
 m_V_hat <- estimate_m_mu(Y_Delta, ts) # m × 1 向量值为估计值

@@ -11,6 +11,9 @@ one_run <- function(K, n_ave, m, sd, L = NULL) {
   set.seed(456)
   sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)#m+1* K 矩阵
   sigma <- sigma / max(sigma)  # 归一化防止数值不稳定
+  # V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)
+  # sigma2 <- exp(V_true)
+  # sigma <- sqrt(sigma2)
 
   set.seed(789)
   mu <- generate_K_trajectory(K, b, delta, beta, l, m) #m+1* K 矩阵

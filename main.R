@@ -47,11 +47,19 @@ if (length(args) > 0) {
   }
 }
 
+
 # 判断当前运行环境
 if (sys.nframe() == 0) {
   if (length(args_list) > 0) {
-    do.call(run_main, args_list)  # 有命令行参数时
+    # 有命令行参数时，只运行一个组合
+    do.call(run_main, args_list)
   } else {
-    run_main()                    # 无参数，使用 config 默认值
+    # 无参数时，枚举所有参数组合
+    for (K_val in K_grid) {
+      for (n_val in n_ave_grid) {
+        run_main(K = K_val, n_ave = n_val)
+      }
+    }
   }
 }
+

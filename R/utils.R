@@ -86,18 +86,18 @@ plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
 }
 
 # 计算 q0 的值
-compute_qk_mc <- function(nk, B = 1e6, seed = 123) {
-  # 设置随机种子以保证可复现
+# 计算每个 n_k 对应的 q_k，支持向量输入
+compute_qk_mc <- function(n_vec, B = 1e6, seed = 123) {
   set.seed(seed)
   
-  # 生成 B 个自由度为 nk 的卡方随机变量
-  samples <- rchisq(B, df = nk)
+  q_vec <- sapply(n_vec, function(nk) {
+    samples <- rchisq(B, df = nk)
+    mean(log(samples)) - log(nk)
+  })
   
-  # 计算期望 E[log(χ²_nk)] - log(nk)
-  qk <- mean(log(samples)) - log(nk)
-  
-  return(qk)
+  return(q_vec)
 }
+
 
 evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval = 1) {
   stopifnot(dim(V_true) == dim(V_hat))
