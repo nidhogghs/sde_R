@@ -1,4 +1,4 @@
-
+# R/mu_sigma_est.R
 
 estimate_mu_from_data <- function(sim_data, L = NULL) {
   ts <- sim_data$ts
