@@ -1,14 +1,26 @@
+source("config.R")
+source("R/simulation.R")
+source("R/estimation.R")
+source("R/recovery.R")
+source("R/utils.R")
+library(np)
+library(ggplot2)
+library(reshape2)
 #先生成指数，再产生sigma
 prepare_simulation_data <- function(K, n_ave, m, k = 2, l = 2,
-                                    seed_sigma =789, seed_mu = 456, seed_X = 69) {
+                                    seed_sigma =311, seed_mu = 311, seed_X = 69,scale_sigma = 5) {
   delta <- T / m
   ts <- seq(delta, T, length.out = m)
   n_vec <- rep(n_ave, K)
 
   set.seed(seed_sigma)
   V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)
+  V_true <- V_true
   sigma2 <- exp(V_true)
   sigma <- sqrt(sigma2)
+
+  sigma <- sigma/scale_sigma
+  sigma2 <- sigma^2
 
   set.seed(seed_mu)
   mu <- generate_K_trajectory(K, b, delta, beta, l, m)
@@ -31,7 +43,7 @@ prepare_simulation_data <- function(K, n_ave, m, k = 2, l = 2,
 
 #直接生成sigma，此部分仅用于测试对μ的估计
 prepare_simulation_data2 <- function(K, n_ave, m, k = 2, l = 2, 
-                                    seed_sigma = 789, seed_mu = 456, seed_X = 69) {
+                                    seed_sigma = 311, seed_mu = 311, seed_X = 69) {
   delta <- T / m
   ts <- seq(delta, T, length.out = m)
   n_vec <- rep(n_ave, K)
@@ -218,7 +230,7 @@ test_sigma_inference <- function(K = 100, n_ave = 300, m = 50, L = NULL) {
     cat(sprintf("Selected L = %d\n", L))
   }
 
-  V_hat <- recover_mu(Y_Delta, m_V_hat, PCs_hat, L, K)
+  V_hat <- recover_mu(Y_Delta, m_V_hat, PCs_hat, L, K) 
   sigma2_hat <- exp(V_hat)
 
   plot_compare_single(sim_data$ts, sim_data$V_true[-1, ], V_hat, k = 1, label = "V_k(t)")
@@ -226,3 +238,71 @@ test_sigma_inference <- function(K = 100, n_ave = 300, m = 50, L = NULL) {
 }
 
 
+test_mu_traditional_vs_truth <- function(K = 100, n_ave = 500, m = 50,
+                                          k_basis = 2, l_basis = 2, scale_sigma = 5,
+                                          seed_sigma = 311, seed_mu = 311, seed_X = 69,
+                                          show_plot_k = c(1), bw_method = "cv.aic") {
+
+  # Step 1: 生成仿真数据
+  sim_data <- prepare_simulation_data(
+    K = K, n_ave = n_ave, m = m,
+    k = k_basis, l = l_basis,
+    scale_sigma = scale_sigma,
+    seed_sigma = seed_sigma,
+    seed_mu = seed_mu,
+    seed_X = seed_X
+  )
+
+  X_Delta <- sim_data$X_Delta
+  ts <- sim_data$ts
+  delta <- sim_data$delta
+  n_vec <- sim_data$n_vec
+  mu_true <- sim_data$mu_true   # m × K
+
+  # Step 2: 估计每个 μ_k(t) 传统方法
+  mu_hat_mat <- matrix(NA, m, K)
+  col_start <- 1
+
+  if (max(sim_data$n_vec) == 1) {
+      Z_Delta <- X_Delta
+    } else {
+      Z_Delta <- cluster_mean(X_Delta, K, sim_data$n_vec) / sqrt(sim_data$delta)
+    }
+
+  for (k in 1:K) {
+  y_k <- Z_Delta[, k]  # 抽取第k个过程的聚合增量
+  
+  df <- data.frame(t = ts, y = y_k)
+  fit <- npreg(y ~ t, data = df, regtype = "ll", bwmethod = bw_method)
+  mu_hat_mat[, k] <- predict(fit, newdata = data.frame(t = ts))
+  }
+  
+
+  # Step 3: 误差评估
+  mse_vec <- colMeans((mu_hat_mat - mu_true)^2)
+  rmse_vec <- sqrt(mse_vec)
+  avg_rmse <- mean(rmse_vec)
+  max_rmse <- max(rmse_vec)
+
+  cat(sprintf("=== Traditional Method RMSE Results ===\n"))
+  cat(sprintf("Average RMSE across K: %.6f\n", avg_rmse))
+  cat(sprintf("Maximum RMSE among K: %.6f\n", max_rmse))
+
+  # Step 4: 可视化若干条曲线对比
+  par(mfrow = c(length(show_plot_k), 1), mar = c(4, 4, 2, 1))
+  for (k in show_plot_k) {
+    plot(ts, mu_true[, k], type = "l", lwd = 2, col = "black",
+         ylab = expression(mu[k](t)), xlab = "t",
+         main = paste0("Process k = ", k, ": True vs Traditional"))
+    lines(ts, mu_hat_mat[, k], col = "red", lwd = 2, lty = 2)
+    legend("topright", legend = c("True", "Traditional"), col = c("black", "red"), lty = c(1, 2), lwd = 2)
+  }
+
+  invisible(list(
+    ts = ts,
+    mu_true = mu_true,
+    mu_hat = mu_hat_mat,
+    rmse = rmse_vec,
+    avg_rmse = avg_rmse
+  ))
+}
