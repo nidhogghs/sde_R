@@ -15,12 +15,12 @@ library(ggplot2)                 # 基础 ggplot 绘图
 library(reshape2)                # 数据长宽转换
 
 # ======= Step 1: 模拟数据 =======
-sim_data <- prepare_simulation_data(
+sim_data <- prepare_simulation_data2(
   K = 300,           # 过程个数
   n_ave = 500,       # 每个过程的子样本数
   m = 50,            # 时间网格数
   l = 4,              # μ 的主成分个数（真实结构）
-  scale_sigma = 5
+  scale_sigma = 10
 )
 
 # ======= Step 2: 估计 μ_k(t) =======

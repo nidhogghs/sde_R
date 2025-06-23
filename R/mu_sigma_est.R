@@ -38,7 +38,7 @@ inference_sigma_from_data <- function(sim_data, L = NULL) {
   m <- length(ts)
   K <- length(sim_data$n_vec)
 
-  q_vec <- compute_qk_mc(sim_data$n_vec)
+  q_vec <- compute_qk(sim_data$n_vec)
   Y_Delta <- construct_Y(sim_data$X_Delta, sim_data$n_vec, q_vec)
 
   m_V_hat <- estimate_m_mu(Y_Delta, ts)

@@ -98,6 +98,12 @@ compute_qk_mc <- function(n_vec, B = 1e6, seed = 123) {
   return(q_vec)
 }
 
+# 使用近似公式计算每个 n_k 对应的 q_k，支持向量输入
+compute_qk<- function(n_vec) {
+  q_vec <- -1 / (2 * n_vec) - 1 / (12 * n_vec^2)
+  return(q_vec)
+}
+
 
 evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval = 1) {
   stopifnot(dim(V_true) == dim(V_hat))

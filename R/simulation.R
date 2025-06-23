@@ -94,3 +94,43 @@ prepare_simulation_data <- function(K, n_ave = NULL, n_vec = NULL, m, k = 2, l =
     X_Delta = X_Delta
   )
 }
+
+prepare_simulation_data2 <- function(K, n_ave = NULL, n_vec = NULL, m, k = 2, l = 2,
+                                    seed_sigma = 311, seed_mu = 311, seed_X = 69, scale_sigma = 5) {
+  if (is.null(n_vec)) {
+    if (is.null(n_ave)) stop("You must provide either n_vec or n_ave.")
+    n_vec <- rep(n_ave, K)
+  } else {
+    if (length(n_vec) != K) stop("Length of n_vec must be equal to K.")
+  }
+
+  delta <- T / m
+  ts <- seq(delta, T, length.out = m)
+
+  set.seed(seed_sigma)
+  sigma <- generate_K_trajectory(K, a, delta, alpha, k, m)
+  sigma <- sigma / max(sigma)  # 归一化防止数值不稳定
+  sigma2 <- sigma^2
+
+  V_true <- log(sigma2)
+  V_scaled <- V_true
+
+
+  set.seed(seed_mu)
+  mu <- generate_K_trajectory(K, b, delta, beta, l, m)
+
+  set.seed(seed_X)
+  X <- generate_n_X(n_vec, sigma, mu, X0)
+
+  X_Delta <- variation(log(X), m)
+
+  list(
+    ts = ts,
+    delta = delta,
+    n_vec = n_vec,
+    V_true = V_scaled,
+    sigma2_true = sigma2[-1, ],
+    mu_true = mu[-1, ],
+    X_Delta = X_Delta
+  )
+}

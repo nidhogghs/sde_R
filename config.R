@@ -7,13 +7,13 @@ X0 <- 1           # 初始值 log(X0) 起始点
 
 # sigma(t) 模拟参数
 a <- 1
-alpha <- 1
-k <- 2
+alpha <- 0.3
+k <- 4
 
 # mu(t) 模拟参数
 b <- 1.5
-beta <- 1
-l <- 2
+beta <- 0.5
+l <- 4
 
 # Default simulation grids
 K_grid <- c(100, 300, 500)        # 样本规模列表

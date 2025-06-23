@@ -32,10 +32,10 @@ for (s in 1:Nsim) {
   )
 
   cat("    - Data generated. Estimating mu...\n")
-  mu_res <- estimate_mu_from_data(sim_data, L = 2)
+  mu_res <- estimate_mu_from_data(sim_data)
 
   cat("    - Estimating sigma²...\n")
-  sigma_res <- inference_sigma_from_data(sim_data, L = 2)
+  sigma_res <- inference_sigma_from_data(sim_data)
 
   rmse_mu <- sqrt(mean((mu_res$mu_hat - sim_data$mu_true)^2))
   rmse_sigma <- sqrt(mean((sigma_res$sigma2_hat - sim_data$sigma2_true)^2))
