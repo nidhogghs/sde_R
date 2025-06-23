@@ -1,3 +1,10 @@
+# 加载模块
+source("config.R")
+source("R/simulation.R")
+source("R/estimation.R")
+source("R/recovery.R")
+source("R/utils.R")
+source("R/mu_sigma_est.R")
 args <- commandArgs(trailingOnly = TRUE)
 K <- as.integer(args[1])
 n_ave <- as.integer(args[2])
@@ -10,13 +17,6 @@ k <- as.integer(args[7])
 cat(sprintf("===== BEGIN: K=%d, n_ave=%d, m=%d, l=%d, k=%d, seed_id=%d =====\n",
             K, n_ave, m, l, k, seed_id))
 
-# 加载模块
-source("config.R")
-source("R/simulation.R")
-source("R/estimation.R")
-source("R/recovery.R")
-source("R/utils.R")
-source("R/mu_sigma_est.R")
 
 res_group <- data.frame()
 

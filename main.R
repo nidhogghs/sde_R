@@ -25,6 +25,10 @@ sim_data <- prepare_simulation_data(
 
 # ======= Step 2: 估计 μ_k(t) =======
 mu_res <- estimate_mu_from_data(sim_data)
+# ======= Step 2.5: 输出 μ 的 RMSE =======
+rmse_mu <- sqrt(mean((mu_res$mu_hat - sim_data$mu_true)^2))
+cat(sprintf("RMSE(mu): %.6f\n", rmse_mu))
+
 
 # ======= Step 3: 推断 σ²_k(t) =======
 sigma_res <- inference_sigma_from_data(sim_data)
