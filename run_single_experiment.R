@@ -53,6 +53,9 @@ for (s in 1:Nsim) {
 }
 
 outfile <- sprintf("results/K%d_n%d_m%d_l%d_k%d_seed%d.rds", K, n_ave, m, l, k, seed_id)
+
+dir.create("results", showWarnings = FALSE, recursive = TRUE)
+
 saveRDS(res_group, file = outfile)
 
 cat(sprintf("===== DONE: Results saved to %s =====\n", outfile))
