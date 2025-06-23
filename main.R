@@ -1,65 +1,66 @@
-# ========= 模拟主程序入口 =========
+# ======= 主程序入口 main.R =======
 
-source("config.R")
-source("R/simulation.R")
-source("R/estimation.R")
-source("R/recovery.R")
-source("R/utils.R")
-source("R/one_run.R")
+# 载入配置与函数模块
+source("config.R")               # 模型参数配置
+source("R/simulation.R")         # 数据生成函数
+source("R/estimation.R")         # μ 和 G_μ 的估计
+source("R/recovery.R")           # 主成分重建函数
+source("R/utils.R")              # 工具函数：如 cluster_mean, compute_qk_mc 等
+source("R/mu_sigma_est.R")       # 封装的 estimate_mu_from_data / inference_sigma_from_data
+source("R/traditional.R")
+# 加载绘图和核回归相关库
+library(gridExtra)               # 用于组合多个 ggplot 图
+library(np)                      # 非参数核平滑包
+library(ggplot2)                 # 基础 ggplot 绘图
+library(reshape2)                # 数据长宽转换
 
-library("np")
-library("plotly")
-dir.create("output", showWarnings = FALSE, recursive = TRUE)
+# ======= Step 1: 模拟数据 =======
+sim_data <- prepare_simulation_data(
+  K = 300,           # 过程个数
+  n_ave = 500,       # 每个过程的子样本数
+  m = 50,            # 时间网格数
+  l = 2,              # μ 的主成分个数（真实结构）
+  scale_sigma = 10
+)
 
-run_main <- function(K = NULL, n_ave = NULL, Nsim_local = NULL, m = NULL) {
-  if (is.null(K)) K <- K_grid[1]
-  if (is.null(n_ave)) n_ave <- n_ave_grid[1]
-  if (is.null(Nsim_local)) Nsim_local <- Nsim
-  if (is.null(m)) m <- m_default
+# ======= Step 2: 估计 μ_k(t) =======
+mu_res <- estimate_mu_from_data(sim_data, L = 2)
 
-  res <- list()
-  cat("Running K =", K, "n_ave =", n_ave, "\n")
-  res_N <- sapply(1:Nsim_local, function(sd) {
-    cat("  Simulation:", sd, "\n")
-    one_run(K, n_ave, m, sd)
-  })
-  res_mean <- rowMeans(res_N)
-  res[[paste0("K", K, "_n", n_ave)]] <- res_mean
+# ======= Step 3: 推断 σ²_k(t) =======
+sigma_res <- inference_sigma_from_data(sim_data, L = 2)
 
-  res_df <- do.call(cbind, res)
-  rownames(res_df) <- c("err_m", "err_G", "err_lams", "err_PCs", "err_mu")
-  print("=== 平均误差汇总 ===")
-  print(round(res_df, 4))
-}
+# ======= Step 4: 可视化第 k 条曲线的估计效果 =======
 
+# 绘制 μ_k(t) 与 σ²_k(t) 的真实值与估计值对比图
+#展示第k_show个过程
+k_show <- 3
+p_mu <- plot_compare_single(sim_data$ts, sim_data$mu_true, mu_res$mu_hat, k = k_show, label = "mu_k(t)")
+p_sigma <- plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma_res$sigma2_hat, k = k_show, label = "sigma²_k(t)")
 
-# ========== 自动执行逻辑 ==========
+# 并排展示两个图
+# grid.arrange(p_mu, p_sigma, ncol = 2)
 
-# 从命令行提取参数（Rscript 方式）
-args <- commandArgs(trailingOnly = TRUE)
-args_list <- list()
-if (length(args) > 0) {
-  for (arg in args) {
-    kv <- strsplit(arg, "=")[[1]]
-    key <- kv[1]
-    value <- as.numeric(kv[2])
-    args_list[[key]] <- value
-  }
-}
-
-
-# 判断当前运行环境
-if (sys.nframe() == 0) {
-  if (length(args_list) > 0) {
-    # 有命令行参数时，只运行一个组合
-    do.call(run_main, args_list)
-  } else {
-    # 无参数时，枚举所有参数组合
-    for (K_val in K_grid) {
-      for (n_val in n_ave_grid) {
-        run_main(K = K_val, n_ave = n_val)
-      }
-    }
-  }
-}
-
+# 计算置信区间
+ci_mu <- compute_mu_ci(
+  mu_hat = mu_res$mu_hat,
+  PCs = mu_res$PCs_hat,
+  sigma2_hat = sigma_res$sigma2_hat,
+  ts = sim_data$ts,
+  n_vec = sim_data$n_vec,
+  alpha = 0.05,
+  L = mu_res$L
+)
+# 绘图
+p_ci <- plot_mu_with_ci(
+  ts = sim_data$ts,
+  mu_true = sim_data$mu_true,
+  mu_hat = mu_res$mu_hat,
+  ci_lower = ci_mu$lower,
+  ci_upper = ci_mu$upper,
+  k = k_show
+)
+grid.arrange(p_mu, p_sigma, p_ci, ncol = 3)
+# # === Step 5: 传统方法估计 μ_k(t) 并可视化 ===
+# mu_hat_traditional <- estimate_mu_traditional_from_data(sim_data)
+# res_traditional <- evaluate_traditional_mu_estimation(sim_data, mu_hat_traditional, show_plot_k = c(1, 2, 3))
+# # ======= End of main.R =======

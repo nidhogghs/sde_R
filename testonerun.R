@@ -7,19 +7,24 @@ library(np)
 library(ggplot2)
 library(reshape2)
 #先生成指数，再产生sigma
-prepare_simulation_data <- function(K, n_ave, m, k = 2, l = 2,
-                                    seed_sigma =311, seed_mu = 311, seed_X = 69,scale_sigma = 5) {
+prepare_simulation_data <- function(K, n_ave = NULL, n_vec = NULL, m, k = 2, l = 2,
+                                    seed_sigma = 311, seed_mu = 311, seed_X = 69, scale_sigma = 5) {
+  if (is.null(n_vec)) {
+    if (is.null(n_ave)) stop("You must provide either n_vec or n_ave.")
+    n_vec <- rep(n_ave, K)
+  } else {
+    if (length(n_vec) != K) stop("Length of n_vec must be equal to K.")
+  }
+
   delta <- T / m
   ts <- seq(delta, T, length.out = m)
-  n_vec <- rep(n_ave, K)
 
   set.seed(seed_sigma)
   V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)
-  V_true <- V_true
-  sigma2 <- exp(V_true)
-  sigma <- sqrt(sigma2)
+  V_scaled <- V_true  # 保留未缩放版本以供恢复 σ²
 
-  sigma <- sigma/scale_sigma
+  sigma2 <- exp(V_scaled)
+  sigma <- sqrt(sigma2) / scale_sigma  # 控制扩散强度
   sigma2 <- sigma^2
 
   set.seed(seed_mu)
@@ -34,12 +39,13 @@ prepare_simulation_data <- function(K, n_ave, m, k = 2, l = 2,
     ts = ts,
     delta = delta,
     n_vec = n_vec,
-    V_true = V_true,
+    V_true = V_scaled,
     sigma2_true = sigma2[-1, ],
     mu_true = mu[-1, ],
     X_Delta = X_Delta
   )
 }
+
 
 #直接生成sigma，此部分仅用于测试对μ的估计
 prepare_simulation_data2 <- function(K, n_ave, m, k = 2, l = 2, 
@@ -74,9 +80,11 @@ prepare_simulation_data2 <- function(K, n_ave, m, k = 2, l = 2,
 }
 
 #先生成指数，再对μ估计，结果不好
-test_mu_estimation <- function(K = 300, n_ave = 500, m = 50, L = 2) {
-  sim_data <- prepare_simulation_data(K, n_ave, m, l = 2)
+test_mu_estimation <- function(K = 300, n_ave = 500, n_vec = NULL, m = 50, L = 2) {
+
+  sim_data <- prepare_simulation_data(K = K, n_ave = n_ave, n_vec = n_vec, m = m, l = 2)
   ts <- sim_data$ts
+
   X_Delta <- sim_data$X_Delta
 
   if (max(sim_data$n_vec) == 1) {
@@ -216,7 +224,7 @@ test_mu_estimation2 <- function(K = 300, n_ave = 500, m = 50, L = 2) {
 
 #生成指数再估计sigma，结果较好
 test_sigma_inference <- function(K = 100, n_ave = 300, m = 50, L = NULL) {
-  sim_data <- prepare_simulation_data(K, n_ave, m,l=2)
+  sim_data <- prepare_simulation_data(K, n_ave = n_ave, m = m, l = 2)
   q_vec <- compute_qk_mc(sim_data$n_vec)
   Y_Delta <- construct_Y(sim_data$X_Delta, sim_data$n_vec, q_vec)
 
@@ -237,6 +245,7 @@ test_sigma_inference <- function(K = 100, n_ave = 300, m = 50, L = NULL) {
   plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma2_hat, k = 1, label = "sigma²_k(t)")
 }
 
+#对比直接smoothing
 
 test_mu_traditional_vs_truth <- function(K = 100, n_ave = 500, m = 50,
                                           k_basis = 2, l_basis = 2, scale_sigma = 5,

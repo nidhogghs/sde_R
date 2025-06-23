@@ -27,6 +27,7 @@ generate_K_trajectory <- function(K, a, delta, alpha, k, N){
   sapply(1:K, function(i) generate_one_trajectory(a, delta, alpha, k, N))
 }
 
+#生成轨迹
 generate_n_X <- function(n, sigma, mu, X0){#矩阵，维度为 (m+1) × ∑ n_k
   K <- ncol(sigma)
   m <- nrow(sigma) - 1
@@ -55,14 +56,41 @@ variation <- function(X, m){
   return(y)
 }
 
-# 新增函数：直接生成 V_k(t)，然后取 exp 得到 σ²_k(t)
-generate_V_and_sigma2 <- function(...) {
-  V <- generate_K_trajectory(...)  # 原始 log σ²_k(t)
-  V_min <- min(V)
-  V_max <- max(V)
-  V_scaled <- 4 * (V - V_min) / (V_max - V_min) - 2   # 缩放至 [-2, 2]
+prepare_simulation_data <- function(K, n_ave = NULL, n_vec = NULL, m, k = 2, l = 2,
+                                    seed_sigma = 311, seed_mu = 311, seed_X = 69, scale_sigma = 5) {
+  if (is.null(n_vec)) {
+    if (is.null(n_ave)) stop("You must provide either n_vec or n_ave.")
+    n_vec <- rep(n_ave, K)
+  } else {
+    if (length(n_vec) != K) stop("Length of n_vec must be equal to K.")
+  }
+
+  delta <- T / m
+  ts <- seq(delta, T, length.out = m)
+
+  set.seed(seed_sigma)
+  V_true <- generate_K_trajectory(K, a, delta, alpha, k, m)
+  V_scaled <- V_true  # 保留未缩放版本以供恢复 σ²
 
   sigma2 <- exp(V_scaled)
-  sigma <- sqrt(sigma2)
-  return(list(sigma = sigma, sigma2 = sigma2, V = V_scaled))
+  sigma <- sqrt(sigma2) / scale_sigma  # 控制扩散强度
+  sigma2 <- sigma^2
+
+  set.seed(seed_mu)
+  mu <- generate_K_trajectory(K, b, delta, beta, l, m)
+
+  set.seed(seed_X)
+  X <- generate_n_X(n_vec, sigma, mu, X0)
+
+  X_Delta <- variation(log(X), m)
+
+  list(
+    ts = ts,
+    delta = delta,
+    n_vec = n_vec,
+    V_true = V_scaled,
+    sigma2_true = sigma2[-1, ],
+    mu_true = mu[-1, ],
+    X_Delta = X_Delta
+  )
 }

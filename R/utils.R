@@ -82,7 +82,7 @@ plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
          x = "t", y = label) +
     theme_minimal()
 
-  print(p)  # 显示图像
+  return(p)  # 显示图像
 }
 
 # 计算 q0 的值
@@ -141,3 +141,26 @@ evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval
   ))
 }
 
+plot_mu_with_ci <- function(ts, mu_true, mu_hat, ci_lower, ci_upper, k = 1) {
+  if (is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
+  if (is.vector(mu_hat)) mu_hat <- matrix(mu_hat, ncol = 1)
+  if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
+  if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
+
+  df <- data.frame(
+    t = ts,
+    True = mu_true[, k],
+    Estimate = mu_hat[, k],
+    CI_lower = ci_lower[, k],
+    CI_upper = ci_upper[, k]
+  )
+
+  ggplot(df, aes(x = t)) +
+    geom_ribbon(aes(ymin = CI_lower, ymax = CI_upper), fill = "#14bddb", alpha = 0.6) +
+    geom_line(aes(y = True, color = "True"), linewidth = 1.1) +
+    geom_line(aes(y = Estimate, color = "Estimate"), linewidth = 1.1, linetype = "dashed") +
+    labs(title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
+         x = "t", y = expression(mu[k](t)), color = "Type") +
+    scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
+    theme_minimal()
+}
