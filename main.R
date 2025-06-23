@@ -19,12 +19,12 @@ sim_data <- prepare_simulation_data(
   K = 300,           # 过程个数
   n_ave = 500,       # 每个过程的子样本数
   m = 50,            # 时间网格数
-  l = 2,              # μ 的主成分个数（真实结构）
+  l = 4,              # μ 的主成分个数（真实结构）
   scale_sigma = 10
 )
 
 # ======= Step 2: 估计 μ_k(t) =======
-mu_res <- estimate_mu_from_data(sim_data, L = 2)
+mu_res <- estimate_mu_from_data(sim_data)
 
 # ======= Step 3: 推断 σ²_k(t) =======
 sigma_res <- inference_sigma_from_data(sim_data, L = 2)
