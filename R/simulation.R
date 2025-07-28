@@ -2,6 +2,7 @@
 # ========== 模拟相关函数 ==========
 
 generate_one_trajectory <- function(a, delta, alpha, k, N){
+  # kappa <- function(x) x^2
   kappa <- function(x) 100 * x^3 * (1 - x)^3
   seq1 <- seq(0, 1, 1 / N)
   part1 <- sapply(seq1, kappa)

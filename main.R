@@ -16,9 +16,10 @@ library(reshape2)                # 数据长宽转换
 
 # ======= Step 1: 模拟数据 =======
 sim_data <- prepare_simulation_data(
-  K = 300,           # 过程个数
-  n_ave = 500,       # 每个过程的子样本数
+  K = 500,           # 过程个数
+  n_ave = 5,       # 每个过程的子样本数
   m = 50,            # 时间网格数
+  k = 3,
   l = 4,              # μ 的主成分个数（真实结构）
   scale_sigma = 5
 )
@@ -37,7 +38,7 @@ sigma_res <- inference_sigma_from_data(sim_data)
 
 # 绘制 μ_k(t) 与 σ²_k(t) 的真实值与估计值对比图
 #展示第k_show个过程
-k_show <- 10
+k_show <- 1
 p_mu <- plot_compare_single(sim_data$ts, sim_data$mu_true, mu_res$mu_hat, k = k_show, label = "mu_k(t)")
 p_sigma <- plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma_res$sigma2_hat, k = k_show, label = "sigma²_k(t)")
 
@@ -68,3 +69,22 @@ grid.arrange(p_mu, p_sigma, p_ci, ncol = 3)
 # mu_hat_traditional <- estimate_mu_traditional_from_data(sim_data)
 # res_traditional <- evaluate_traditional_mu_estimation(sim_data, mu_hat_traditional, show_plot_k = c(1, 2, 3))
 # # ======= End of main.R =======
+# ===== Visualize and compare m_mu(t) =====
+m_mu_true <- rowMeans(sim_data$mu_true)       # true mean function
+m_mu_hat  <- mu_res$m_mu_hat                  # estimated mean
+
+df_m_mu <- data.frame(
+  t = sim_data$ts,
+  True = m_mu_true,
+  Estimated = m_mu_hat
+)
+df_m_mu_long <- reshape2::melt(df_m_mu, id.vars = "t",
+                               variable.name = "Type", value.name = "Value")
+
+p_m_mu <- ggplot(df_m_mu_long, aes(x = t, y = Value, color = Type)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Comparison of m_mu(t): True vs Estimated",
+       x = "t", y = "m_mu(t)") +
+  theme_minimal()
+
+grid.arrange(p_mu, p_sigma, p_ci,p_m_mu, ncol = 4)

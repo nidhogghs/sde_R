@@ -6,7 +6,7 @@ estimate_mu_from_data <- function(sim_data, L = NULL) {
   K <- length(sim_data$n_vec)
 
   if (max(sim_data$n_vec) == 1) {
-    Z_Delta <- sim_data$X_Delta
+    Z_Delta <- sim_data$X_Delta / sqrt(sim_data$delta)
   } else {
     Z_Delta <- cluster_mean(sim_data$X_Delta, K, sim_data$n_vec) / sqrt(sim_data$delta)
   }
