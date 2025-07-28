@@ -67,3 +67,11 @@ output_file <- sprintf("output/result_seed%03d_K%d_n%d_k%d_l%d.csv",
                        params$seed, params$K, params$n_ave, params$k, params$l)
 
 write.csv(res, file = output_file, row.names = FALSE)
+
+# 获取输出目录参数（如通过环境变量或由 summarize 脚本处理）
+output_dir <- Sys.getenv("OUTPUT_DIR", unset = "output")
+
+output_file <- sprintf("%s/result_seed%03d_K%d_n%d_k%d_l%d.csv",
+                       output_dir, params$seed, params$K, params$n_ave, params$k, params$l)
+
+write.csv(res, file = output_file, row.names = FALSE)
