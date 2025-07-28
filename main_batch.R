@@ -53,7 +53,7 @@ rmse_sigma2  <- sqrt(mean((sigma_res$sigma2_hat - sim_data$sigma2_true)^2))
 res <- data.frame(
   seed = params$seed,
   K = params$K,
-  n_ave = params$n_ave,Rscript summarize_results.R
+  n_ave = params$n_ave,
   k = params$k,
   l = params$l,
   rmse_mu = rmse_mu,
