@@ -17,9 +17,9 @@ library(reshape2)                # 数据长宽转换
 # ======= Step 1: 模拟数据 =======
 sim_data <- prepare_simulation_data(
   K = 500,           # 过程个数
-  n_ave = 5,       # 每个过程的子样本数
-  m = 50,            # 时间网格数
-  k = 3,
+  n_ave = 600,       # 每个过程的子样本数
+  m = 70,            # 时间网格数
+  k = 4,
   l = 4,              # μ 的主成分个数（真实结构）
   scale_sigma = 5
 )
@@ -38,7 +38,7 @@ sigma_res <- inference_sigma_from_data(sim_data)
 
 # 绘制 μ_k(t) 与 σ²_k(t) 的真实值与估计值对比图
 #展示第k_show个过程
-k_show <- 1
+k_show <- 2
 p_mu <- plot_compare_single(sim_data$ts, sim_data$mu_true, mu_res$mu_hat, k = k_show, label = "mu_k(t)")
 p_sigma <- plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma_res$sigma2_hat, k = k_show, label = "sigma²_k(t)")
 

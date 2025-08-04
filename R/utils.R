@@ -39,7 +39,16 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 10) {
   K <- ncol(Z_Delta)  # 样本数（个体数）
   m <- nrow(Z_Delta)  # 时间点数
   aic_values <- numeric(max_L)  # 储存各个 L 值对应的 AIC
-
+    # 设置惩罚强度 penalty
+  penalty <- if (K < 50) {
+    0.001
+  } else if (K < 200) {
+    0.5
+  } else if (K < 500) {
+    1
+  } else {
+    2
+  }
   for (L in 1:max_L) {
     Z_hat <- matrix(0, m, K)  # 重构的 Z 值
     for (i in 1:K) {
@@ -56,13 +65,75 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 10) {
     rss <- sum((Z_Delta - Z_hat)^2)
 
     # AIC 计算：拟合误差 + 模型复杂度惩罚
-    aic_values[L] <- K * log(rss / (K * m)) + 2 * L * m
+    aic_values[L] <- K * log(rss / (K * m)) + penalty * L * m
   }
 
   # 返回使 AIC 最小的 L
   return(which.min(aic_values))
 }
 
+# select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 10,
+#                             fve_thresh = 0.90) {
+
+#   K <- ncol(Z_Delta);  m <- nrow(Z_Delta)
+#   n_tot <- K * m
+
+#   rss_L <- function(L) {
+#     Z_hat <- matrix(rep(m_mu, K), nrow = m)
+#     for (i in seq_len(K)) {
+#       for (j in seq_len(L)) {
+#         xi_hat <- mean((Z_Delta[, i] - m_mu) * PCs[, j])
+#         Z_hat[, i] <- Z_hat[, i] + xi_hat * PCs[, j]
+#       }
+#     }
+#     sum((Z_Delta - Z_hat)^2)
+#   }
+
+
+#   # ---------- (A) 小样本：LOOCV ----------
+#   if (K < 50) {
+#     cv <- numeric(max_L)
+#     for (L in seq_len(max_L)) {
+#       err <- 0
+#       for (i in seq_len(K)) {
+#         Zi      <- Z_Delta[, i]
+#         Z_train <- Z_Delta[, -i, drop = FALSE]
+#         m_train <- rowMeans(Z_train)
+#         Zi_hat  <- m_train
+#         for (j in seq_len(L)) {
+#           xi_hat <- mean((Zi - m_train) * PCs[, j])
+#           Zi_hat <- Zi_hat + xi_hat * PCs[, j]
+#         }
+#         err <- err + sum((Zi - Zi_hat)^2)
+#       }
+#       cv[L] <- err / (K * m)
+#     }
+#     L_opt <- which.min(cv)
+#     attr(L_opt, "criterion") <- "LOOCV"
+#     return(L_opt)
+#   }
+
+#   ## ---------- 中/大样本：BIC + FVE ----------
+#   bic  <- numeric(max_L)
+#   rssv <- numeric(max_L)
+
+#   for (L in seq_len(max_L)) {
+#     rssv[L] <- rss_L(L)
+#     k_eff   <- L * (m + K)          # *** 修正的有效参数 ***
+#     bic[L]  <- n_tot * log(rssv[L] / n_tot) + log(n_tot) * k_eff
+#   }
+
+#   L_bic <- which.min(bic)
+
+#   # 累计方差解释率 (FVE)
+#   lam <- colSums(PCs[, 1:max_L]^2)
+#   fve <- cumsum(lam) / sum(lam)
+#   L_fve <- min(which(fve >= fve_thresh))
+
+#   L_opt <- max(L_bic, L_fve)
+#   attr(L_opt, "criterion") <- paste0("BIC+FVE(", round(fve[L_opt]*100,1),"%)")
+#   return(L_opt)
+# }
 
 
 plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
