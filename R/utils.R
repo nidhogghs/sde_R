@@ -35,21 +35,21 @@ cluster_mean <- function(X, K, n) {
 #   max_L: 最大允许的主成分数
 # 输出:
 #   L_hat: 使 AIC 最小的主成分数
-select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 10) {
+select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 20) {
   K <- ncol(Z_Delta)  # 样本数（个体数）
   m <- nrow(Z_Delta)  # 时间点数
   aic_values <- numeric(max_L)  # 储存各个 L 值对应的 AIC
     # 设置惩罚强度 penalty
-  penalty <- 0.005
-  # penalty <- if (K < 50) {
-  #   0.001
-  # } else if (K < 200) {
-  #   0.5
-  # } else if (K < 500) {
-  #   1
-  # } else {
-  #   2
-  # }
+  # penalty <- 0.001
+  penalty <- if (K < 50) {
+    0.001
+  } else if (K < 200) {
+    0.5
+  } else if (K < 500) {
+    1
+  } else {
+    2
+  }
   for (L in 1:max_L) {
     Z_hat <- matrix(0, m, K)  # 重构的 Z 值
     for (i in 1:K) {

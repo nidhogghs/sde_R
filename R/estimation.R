@@ -20,8 +20,8 @@ estimate_G_mu <- function(Z_Delta, m_mu_hat, m, K, h_min = 0.021){
     X1 = coor1[-idx_diag],
     X2 = coor2[-idx_diag]
   )
-
-  h1 <- max((K * ncol(Z_Delta) / m)^(-1/3), h_min)
+  # h1 <- max((K * ncol(Z_Delta) / m)^(-1/3), h_min)
+  h1 <- h_min
   fit2 <- npreg(Y ~ X1 + X2, data = data2, regtype = "ll", bws = c(h1, h1) * 0.2)
   G_hat <- predict(fit2, newdata = data.frame(X1 = coor1, X2 = coor2))
   return(matrix(G_hat, m, m))
