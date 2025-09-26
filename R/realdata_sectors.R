@@ -23,7 +23,11 @@ load_sectors_folder_as_sim_data <- function(data_dir,
                                             date_col = "date",
                                             assume_price_not_log = TRUE,
                                             max_rows = NULL,
-                                            max_cols = NULL) {
+                                            max_cols = NULL,
+                                            row_start = NULL,
+                                            row_end = NULL,
+                                            col_start = NULL,
+                                            col_end = NULL) {
   stopifnot(dir.exists(data_dir))
   files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
   if (length(files) == 0L) stop("No CSV files under '", data_dir, "'.")
@@ -63,8 +67,19 @@ load_sectors_folder_as_sim_data <- function(data_dir,
       next
     }
 
-    # limit to first max_cols (if provided)
-    val_names <- if (!is.null(max_cols)) head(val_names_all, max_cols) else val_names_all
+    # limit to selected column range if provided
+    if (!is.null(col_start) || !is.null(col_end)) {
+      col_start_idx <- if (is.null(col_start)) 1L else max(1L, as.integer(col_start))
+      col_end_idx   <- if (is.null(col_end)) length(val_names_all) else min(length(val_names_all), as.integer(col_end))
+      if (col_start_idx > col_end_idx) {
+        stop(sprintf("Invalid column range [%d, %d] for file %s", col_start_idx, col_end_idx, basename(f)))
+      }
+      val_names <- val_names_all[col_start_idx:col_end_idx]
+    } else if (!is.null(max_cols)) {
+      val_names <- head(val_names_all, max_cols)
+    } else {
+      val_names <- val_names_all
+    }
     vals_raw  <- df[, val_names, drop = FALSE]
     vals      <- .as_numeric_matrix(vals_raw)
 
@@ -95,6 +110,17 @@ load_sectors_folder_as_sim_data <- function(data_dir,
       common_dates <- head(common_dates, max_rows)
       cat("[Info] Using first", length(common_dates), "rows (dates) for a light test run.\n")
     }
+  }
+
+  if (!is.null(row_start) || !is.null(row_end)) {
+    total_rows <- length(common_dates)
+    row_start_idx <- if (is.null(row_start)) 1L else max(1L, as.integer(row_start))
+    row_end_idx   <- if (is.null(row_end)) total_rows else min(total_rows, as.integer(row_end))
+    if (row_start_idx > row_end_idx) {
+      stop(sprintf("Invalid row range [%d, %d] given total rows %d", row_start_idx, row_end_idx, total_rows))
+    }
+    common_dates <- common_dates[row_start_idx:row_end_idx]
+    cat(sprintf("[Info] Using date rows [%d, %d] (total %d).\n", row_start_idx, row_end_idx, length(common_dates)))
   }
   if (length(common_dates) < 2L) stop("Too few common dates across sectors.")
   cat("[Info] Common trading dates:", length(common_dates), "\n")
