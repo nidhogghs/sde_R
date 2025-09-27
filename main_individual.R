@@ -124,7 +124,7 @@ run_once <- function(n_ave, K = 500, m = 50, k_true = 4, l_true = 4, scale_sigma
   message(sprintf("Saved: %s", out_file))
 }
 
-# ---- 实际运行：n_ave = 10 和 100 ----
+# ---- 实际运行：n_ave = 30 和 300 ----
 run_once(n_ave = 30)
 run_once(n_ave = 300)
 

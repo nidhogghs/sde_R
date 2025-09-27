@@ -40,7 +40,7 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 20) {
   m <- nrow(Z_Delta)  # 时间点数
   aic_values <- numeric(max_L)  # 储存各个 L 值对应的 AIC
     # 设置惩罚强度 penalty
-  # penalty <- 0.001
+  # penalty <- 0.0000055 
   penalty <- if (K < 50) {
     0.001
   } else if (K < 200) {

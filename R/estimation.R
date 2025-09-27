@@ -5,7 +5,8 @@ library("np")
 library("plotly")
 estimate_m_mu <- function(Z_Delta, ts){
   data1 <- data.frame(Y = rowMeans(Z_Delta), X = ts)
-  fit1 <- npreg(Y ~ X, data = data1, regtype = "ll", bwmethod = "cv.aic")
+  fit1 <- npreg(Y ~ X, data = data1, regtype = "ll", bws = 0.02)
+  #fit1 <- npreg(Y ~ X, data = data1, regtype = "ll", bwmethod = "cv.aic")
   predict(fit1, newdata = data.frame(X = ts))
 }
 

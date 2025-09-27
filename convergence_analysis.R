@@ -182,11 +182,10 @@ mu_plot_long <- melt(mu_plot_df, id.vars = c("index", "time", "n_ave"),
 
 p2 <- ggplot(mu_plot_long, aes(x = time, y = mu, color = Method)) +
   geom_line() +
-  facet_wrap(~ n_ave, ncol = 2) +
+  facet_wrap(~ n_ave, ncol = 2, labeller = label_both) +
   labs(title = sprintf("True vs Estimates (N=%d, seed=1, n=1)", K),
        x = "Time", y = "mu") +
   theme_minimal()
-
 ggsave("mu_compare_traditional.png", p2, width = 8, height = 6)
 
 if (length(eigenfun_store) > 0) {
