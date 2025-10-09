@@ -279,14 +279,65 @@ evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval
 #          x = "t", y = expression(mu[k](t))) +
 #     theme_minimal()
 # }
+
+# plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
+#   # 保证向量也变成列矩阵，统一索引
+#   if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
+#   if (is.vector(mu_hat))   mu_hat   <- matrix(mu_hat,   ncol = 1)
+#   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
+#   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
+
+#   # 越界保护
+#   ncol_mu_hat   <- ncol(mu_hat)
+#   ncol_ci_lower <- ncol(ci_lower)
+#   ncol_ci_upper <- ncol(ci_upper)
+#   if (k < 1 || k > ncol_mu_hat || k > ncol_ci_lower || k > ncol_ci_upper) {
+#     stop(sprintf("k=%d 越界：mu_hat有%d列, ci_lower有%d列, ci_upper有%d列",
+#                  k, ncol_mu_hat, ncol_ci_lower, ncol_ci_upper))
+#   }
+#   if (!is.null(mu_true) && k > ncol(mu_true)) {
+#     stop(sprintf("k=%d 越界：mu_true 只有 %d 列", k, ncol(mu_true)))
+#   }
+
+#   # 分层使用各自的数据帧，避免某层引用不到列
+#   df_ci  <- data.frame(t = ts, CI_lower = ci_lower[, k], CI_upper = ci_upper[, k])
+#   df_est <- data.frame(t = ts, Estimate = mu_hat[, k])
+
+#   p <- ggplot() +
+#     geom_ribbon(data = df_ci,
+#                 aes(x = t, ymin = CI_lower, ymax = CI_upper),
+#                 fill = "#14bddb", alpha = 0.6)
+
+#   if (!is.null(mu_true)) {
+#     df_true <- data.frame(t = ts, True = mu_true[, k])
+
+#     # 分别把“真值”和“估计”作为不同数据层，并用颜色映射生成图例
+#     p <- p +
+#       geom_line(data = df_true, aes(x = t, y = True, color = "True"), linewidth = 1.1) +
+#       geom_line(data = df_est,  aes(x = t, y = Estimate, color = "Estimate"),
+#                 linewidth = 1.1, linetype = "dashed") +
+#       scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
+#       labs(color = "Type")
+#   } else {
+#     # 没有真值时，不使用颜色映射，直接固定颜色
+#     p <- p +
+#       geom_line(data = df_est, aes(x = t, y = Estimate), color = "black", linewidth = 1.1)
+#   }
+
+#   p +
+#     labs(title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
+#          x = "t", y = expression(mu[k](t))) +
+#     theme_minimal()
+# }
+
 plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
-  # 保证向量也变成列矩阵，统一索引
+  # —— 输入整理：确保按列处理（不影响接口）——
   if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
   if (is.vector(mu_hat))   mu_hat   <- matrix(mu_hat,   ncol = 1)
   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
 
-  # 越界保护
+  # —— 越界保护（报错信息保留中文，不出现在图里）——
   ncol_mu_hat   <- ncol(mu_hat)
   ncol_ci_lower <- ncol(ci_lower)
   ncol_ci_upper <- ncol(ci_upper)
@@ -298,33 +349,72 @@ plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 
     stop(sprintf("k=%d 越界：mu_true 只有 %d 列", k, ncol(mu_true)))
   }
 
-  # 分层使用各自的数据帧，避免某层引用不到列
+  # —— 分层数据帧 —— 
   df_ci  <- data.frame(t = ts, CI_lower = ci_lower[, k], CI_upper = ci_upper[, k])
   df_est <- data.frame(t = ts, Estimate = mu_hat[, k])
 
+  # —— 基底图：让 ribbon 进入图例（英文标签）——
   p <- ggplot() +
-    geom_ribbon(data = df_ci,
-                aes(x = t, ymin = CI_lower, ymax = CI_upper),
-                fill = "#14bddb", alpha = 0.6)
+    geom_ribbon(
+      data = df_ci,
+      aes(x = t, ymin = CI_lower, ymax = CI_upper, fill = "95% CI"),
+      alpha = 0.25, colour = NA
+    )
 
+  # —— 线条图层：颜色 + 线型同时区分，进入同一英文图例 —— 
   if (!is.null(mu_true)) {
     df_true <- data.frame(t = ts, True = mu_true[, k])
-
-    # 分别把“真值”和“估计”作为不同数据层，并用颜色映射生成图例
     p <- p +
-      geom_line(data = df_true, aes(x = t, y = True, color = "True"), linewidth = 1.1) +
-      geom_line(data = df_est,  aes(x = t, y = Estimate, color = "Estimate"),
-                linewidth = 1.1, linetype = "dashed") +
-      scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
-      labs(color = "Type")
+      geom_line(
+        data = df_true,
+        aes(x = t, y = True, color = "True", linetype = "True"),
+        linewidth = 1.05
+      ) +
+      geom_line(
+        data = df_est,
+        aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
+        linewidth = 1.05
+      )
   } else {
-    # 没有真值时，不使用颜色映射，直接固定颜色
     p <- p +
-      geom_line(data = df_est, aes(x = t, y = Estimate), color = "black", linewidth = 1.1)
+      geom_line(
+        data = df_est,
+        aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
+        linewidth = 1.05
+      )
   }
 
-  p +
-    labs(title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
-         x = "t", y = expression(mu[k](t))) +
-    theme_minimal()
+  # —— 手动样式（全英文）：合并 fill/color/linetype 为一个图例 —— 
+  p <- p +
+    scale_fill_manual(
+      name = "Legend",
+      values = c("95% CI" = "#14bddb")
+    ) +
+    scale_color_manual(
+      name = "Legend",
+      values = c("True" = "black", "Estimate" = "#d61c1cff")
+    ) +
+    scale_linetype_manual(
+      name = "Legend",
+      values = c("True" = "solid", "Estimate" = "solid")
+    ) +
+    guides(
+      fill = guide_legend(order = 1, override.aes = list(alpha = 0.25)),
+      color = guide_legend(order = 2),
+      linetype = guide_legend(order = 2)
+    ) +
+    labs(
+      title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
+      x = "t", 
+      y = expression(mu[k](t))
+    ) +
+    theme_bw(base_size = 13) +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(hjust = 0.5)
+    )
+
+  p
 }

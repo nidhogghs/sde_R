@@ -1,8 +1,8 @@
 diff --git a/real_run_sectors.R b/real_run_sectors.R
-index 842c4588ef4f45e96372993ce0f90adc6c67290c..7d9278bc1eb93494f062e4a3c5591bf9d529dcc9 100644
+index 842c4588ef4f45e96372993ce0f90adc6c67290c..7f80d1c508b2c1657d3dc238f10e03f3bfdcae92 100644
 --- a/real_run_sectors.R
 +++ b/real_run_sectors.R
-@@ -1,86 +1,107 @@
+@@ -1,96 +1,123 @@
  # real_run_sectors.R — End-to-end run on real sector data (merged/)
  # Usage:
 -#   Rscript real_run_sectors.R data_dir=merged out_dir=output/real_merged k_ci=1 alpha=0.05 [max_rows=..] [max_cols=..]
@@ -105,6 +105,12 @@ index 842c4588ef4f45e96372993ce0f90adc6c67290c..7d9278bc1eb93494f062e4a3c5591bf9
  
  sim_data <- do.call(load_sectors_folder_as_sim_data, args_loader)
  
++if (!is.null(sim_data$aligned_dates)) {
++  date_span <- sim_data$aligned_dates
++  cat(sprintf("[Info] Final aligned trading dates: %s -> %s (%d rows after selection).\n",
++              format(date_span[1]), format(date_span[length(date_span)]), length(date_span)))
++}
++
  # quick sanity check
  K <- length(sim_data$n_vec)
  if (K != 18) {
@@ -120,3 +126,13 @@ index 842c4588ef4f45e96372993ce0f90adc6c67290c..7d9278bc1eb93494f062e4a3c5591bf9
  
  cat("[Step] Building pointwise CI for mu_k(t) ...\n")
  ci <- compute_mu_ci(
+   mu_hat     = mu_res$mu_hat,
+   PCs        = mu_res$PCs_hat,
+   sigma2_hat = sigma_res$sigma2_hat,
+   ts         = sim_data$ts,
+   n_vec      = sim_data$n_vec,
+   alpha      = par$alpha,
+   L          = mu_res$L
+ )
+ 
+ # ---- save core outputs ----
