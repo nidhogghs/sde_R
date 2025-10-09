@@ -14,17 +14,44 @@ print_var <- function(var) {
 #   n: 每个个体的观测次数向量，长度为 K
 # 输出:
 #   X_bar: 每个个体的平均轨迹，维度为 m × K
-cluster_mean <- function(X, K, n) {
-  n <- c(0, n)  # 插入初始 0，方便用 sum(n[1:k]) 定位区间起点
-  X_bar <- matrix(NA, nrow = nrow(X), ncol = K)  # 初始化输出矩阵
+# cluster_mean <- function(X, K, n) {
+#   n <- c(0, n)  # 插入初始 0，方便用 sum(n[1:k]) 定位区间起点
+#   X_bar <- matrix(NA, nrow = nrow(X), ncol = K)  # 初始化输出矩阵
 
-  for (k in 1:K) {
-    start_idx <- sum(n[1:k]) + 1
-    end_idx <- sum(n[1:(k + 1)])
-    X_bar[, k] <- rowMeans(X[, start_idx:end_idx])  # 对每个 cluster 求平均轨迹
+#   for (k in 1:K) {
+#     start_idx <- sum(n[1:k]) + 1
+#     end_idx <- sum(n[1:(k + 1)])
+#     X_bar[, k] <- rowMeans(X[, start_idx:end_idx])  # 对每个 cluster 求平均轨迹
+#   }
+
+#   return(X_bar)
+# }
+cluster_mean <- function(X, K, n) {
+  # 保证是矩阵（数据框也会被安全转成矩阵）
+  if (!is.matrix(X)) X <- as.matrix(X)
+
+  # 基本一致性检查（可按需移除）
+  if (length(n) != K) stop("length(n) 必须等于 K")
+  if (sum(n) != ncol(X)) stop("sum(n) 必须等于 ncol(X)")
+
+  # 计算每个 cluster 的列区间 [Lk, Rk]
+  # offsets: 0, n1, n1+n2, ..., n1+...+nK
+  offsets <- c(0L, cumsum(as.integer(n)))
+
+  X_bar <- matrix(NA_real_, nrow = nrow(X), ncol = K)
+
+  for (k in seq_len(K)) {
+    if (n[k] == 0L) {
+      # 空簇：保持 NA（或改为 0/报错，按需切换）
+      X_bar[, k] <- NA_real_
+    } else {
+      idx <- (offsets[k] + 1L):offsets[k + 1L]
+      # 关键：drop = FALSE，确保仍是矩阵
+      X_bar[, k] <- rowMeans(X[, idx, drop = FALSE])
+    }
   }
 
-  return(X_bar)
+  X_bar
 }
 
 # 基于 AIC 准则选择最优主成分数 L（截断维数）
@@ -40,16 +67,16 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 20) {
   m <- nrow(Z_Delta)  # 时间点数
   aic_values <- numeric(max_L)  # 储存各个 L 值对应的 AIC
     # 设置惩罚强度 penalty
-  # penalty <- 0.0000055 
-  penalty <- if (K < 50) {
-    0.001
-  } else if (K < 200) {
-    0.5
-  } else if (K < 500) {
-    1
-  } else {
-    2
-  }
+   penalty <- 0.0000055 
+  # penalty <- if (K < 50) {
+  #   0.001
+  # } else if (K < 200) {
+  #   0.5
+  # } else if (K < 500) {
+  #   1
+  # } else {
+  #   2
+  # }
   for (L in 1:max_L) {
     Z_hat <- matrix(0, m, K)  # 重构的 Z 值
     for (i in 1:K) {
