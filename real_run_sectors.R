@@ -1,6 +1,7 @@
 # real_run_sectors.R — End-to-end run on real sector data (merged/)
 # Usage:
-#   Rscript real_run_sectors.R data_dir=merged out_dir=output/real_merged k_ci=1 alpha=0.05 [max_rows=..] [max_cols=..]
+#   Rscript real_run_sectors.R data_dir=merged out_dir=output/real_merged k_ci=1 alpha=0.05 \
+#          [max_rows=..] [max_cols=..] [row_start=..] [row_end=..] [col_start=..] [col_end=..]
 # Notes:
 #   - Assumes each CSV in data_dir has a 'date' column and stock close-price columns.
 #   - Each file is a sector (cluster). n_k = number of stock columns in that file.
@@ -29,15 +30,23 @@ par <- list(
   k_ci     = 1,
   alpha    = 0.05,
   max_rows = NA_integer_,
-  max_cols = NA_integer_      # 限制股票列数（不含日期列）；仅当 loader 支持时才传
+  max_cols = NA_integer_,      # 限制股票列数（不含日期列）；仅当 loader 支持时才传
+  row_start = NA_integer_,     # 指定读取的起始行（含），对应时间范围
+  row_end   = NA_integer_,     # 指定读取的结束行（含）
+  col_start = NA_integer_,     # 指定读取的股票起始列（含）
+  col_end   = NA_integer_      # 指定读取的股票结束列（含）
 )
 for (a in args) {
   kv <- strsplit(a, "=")[[1]]
   if (length(kv) == 2 && kv[1] %in% names(par)) {
     key <- kv[1]; val <- kv[2]
-    if (key %in% c("k_ci"))          par[[key]] <- as.integer(val)
-    else if (key %in% c("alpha"))    par[[key]] <- as.numeric(val)
-    else if (key %in% c("max_rows","max_cols")) par[[key]] <- as.integer(val)
+    if (key %in% c("k_ci")) {
+      par[[key]] <- as.integer(val)
+    } else if (key %in% c("alpha")) {
+      par[[key]] <- as.numeric(val)
+    } else if (key %in% c("max_rows", "max_cols", "row_start", "row_end", "col_start", "col_end")) {
+      par[[key]] <- as.integer(val)
+    }
     else par[[key]] <- val
   }
 }
@@ -45,8 +54,29 @@ dir.create(par$out_dir, showWarnings = FALSE, recursive = TRUE)
 if (!exists("h_min")) h_min <- 0.021  # fallback if not set in config.R
 
 cat("[Start] Loading sector CSVs from: ", par$data_dir, "\n")
+if (!is.na(par$max_rows)) {
+  if (is.na(par$row_start) && is.na(par$row_end)) {
+    cat(sprintf("[Info] Limiting to the first %d aligned rows (if supported by loader).\n", par$max_rows))
+  } else {
+    cat("[Info] 'max_rows' provided but an explicit row range will take precedence.\n")
+  }
+}
 if (!is.na(par$max_cols)) {
-  cat(sprintf("[Info] Limiting each sector to the first %d stock columns (if supported by loader).\n", par$max_cols))
+  if (is.na(par$col_start) && is.na(par$col_end)) {
+    cat(sprintf("[Info] Limiting each sector to the first %d stock columns (if supported by loader).\n", par$max_cols))
+  } else {
+    cat("[Info] 'max_cols' provided but an explicit column range will take precedence.\n")
+  }
+}
+if (!is.na(par$row_start) || !is.na(par$row_end)) {
+  cat(sprintf("[Info] Restricting date rows to [%s, %s] (1-indexed, inclusive).\n",
+              ifelse(is.na(par$row_start), "1", par$row_start),
+              ifelse(is.na(par$row_end), "end", par$row_end)))
+}
+if (!is.na(par$col_start) || !is.na(par$col_end)) {
+  cat(sprintf("[Info] Restricting stock columns to [%s, %s] (1-indexed, inclusive).\n",
+              ifelse(is.na(par$col_start), "1", par$col_start),
+              ifelse(is.na(par$col_end), "end", par$col_end)))
 }
 
 # ---- build args safely depending on the loader signature ----
@@ -62,6 +92,18 @@ if ("max_cols" %in% names(formals(load_sectors_folder_as_sim_data))) {
   args_loader$max_cols <- if (is.na(par$max_cols)) NULL else par$max_cols
 } else if (!is.na(par$max_cols)) {
   warning("The loader does not support 'max_cols'; ignoring this CLI argument.")
+}
+if ("row_start" %in% names(formals(load_sectors_folder_as_sim_data))) {
+  args_loader$row_start <- if (is.na(par$row_start)) NULL else par$row_start
+}
+if ("row_end" %in% names(formals(load_sectors_folder_as_sim_data))) {
+  args_loader$row_end <- if (is.na(par$row_end)) NULL else par$row_end
+}
+if ("col_start" %in% names(formals(load_sectors_folder_as_sim_data))) {
+  args_loader$col_start <- if (is.na(par$col_start)) NULL else par$col_start
+}
+if ("col_end" %in% names(formals(load_sectors_folder_as_sim_data))) {
+  args_loader$col_end <- if (is.na(par$col_end)) NULL else par$col_end
 }
 
 # 可选调试：确认生效的函数签名（需要时取消注释）
@@ -96,6 +138,20 @@ ci <- compute_mu_ci(
 # ---- save core outputs ----
 write.csv(mu_res$mu_hat,    file.path(par$out_dir, "mu_hat.csv"),    row.names = FALSE)
 write.csv(mu_res$m_mu_hat,  file.path(par$out_dir, "m_mu_hat.csv"),  row.names = FALSE)
+write.csv(
+  data.frame(ts = sim_data$ts, baseline_m_mu = mu_res$baseline_m_mu),
+  file.path(par$out_dir, "m_mu_baseline.csv"),
+  row.names = FALSE
+)
+write.csv(
+  data.frame(
+    ts = sim_data$ts,
+    kernel_m_mu_hat = mu_res$m_mu_hat,
+    baseline_m_mu = mu_res$baseline_m_mu
+  ),
+  file.path(par$out_dir, "m_mu_comparison.csv"),
+  row.names = FALSE
+)
 write.csv(mu_res$G_mu_hat,  file.path(par$out_dir, "G_mu_hat.csv"),  row.names = FALSE)
 write.csv(mu_res$PCs_hat,   file.path(par$out_dir, "PCs_mu.csv"),    row.names = FALSE)
 write.csv(mu_res$lams_hat,  file.path(par$out_dir, "lams_mu.csv"),   row.names = FALSE)
@@ -121,6 +177,31 @@ p <- plot_mu_with_ci(
 )
 ggsave(filename = file.path(par$out_dir, sprintf("mu_with_CI_k%d.png", par$k_ci)),
        plot = p, width = 8, height = 5, dpi = 150)
+
+# Compare heuristic baseline with kernel estimate of m_mu
+baseline_df <- data.frame(
+  ts = rep(sim_data$ts, 2L),
+  value = c(mu_res$m_mu_hat, mu_res$baseline_m_mu),
+  series = rep(c("Kernel m_mu_hat", "Baseline weighted mean"), each = length(sim_data$ts))
+)
+
+p_baseline <- ggplot(baseline_df, aes(x = ts, y = value, colour = series)) +
+  geom_line(linewidth = 0.6) +
+  labs(
+    title = expression(paste("Comparison of \\hat{m}_\\mu")),
+    x = "t",
+    y = "Value",
+    colour = NULL
+  ) +
+  theme_minimal()
+
+ggsave(
+  filename = file.path(par$out_dir, "m_mu_baseline_vs_kernel.png"),
+  plot = p_baseline,
+  width = 8,
+  height = 5,
+  dpi = 150
+)
 
 cat("[Done] Outputs saved to: ", par$out_dir, "\n")
 

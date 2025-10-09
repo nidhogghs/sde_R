@@ -1,5 +1,29 @@
 # R/mu_sigma_est.R
 
+compute_baseline_m_mu <- function(Z_Delta, window = 9, decay = 0.7) {
+  # Simple heuristic: take row means across stocks, then apply an exponentially
+  # decayed moving average around each time point. This is the classic
+  # exponentially weighted moving average (EWMA) smoother that dates back to
+  # the work of Holt (1957, Operations Research 5(5): 607-617) and the EWMA
+  # control chart of Roberts (1959, Technometrics 1(3): 239-250). The same
+  # smoother is discussed in Brown (1963, "Smoothing, Forecasting and
+  # Prediction of Discrete Time Series") and Hunter (1986, IIE Transactions
+  # 18(2): 247-254). We use it here as a model-free baseline to contrast with
+  # the nonparametric kernel estimate `m_mu_hat`.
+  row_means <- rowMeans(Z_Delta)
+  m <- length(row_means)
+  half_window <- floor(window / 2)
+
+  baseline <- vapply(seq_len(m), function(i) {
+    idx <- max(1, i - half_window):min(m, i + half_window)
+    weights <- decay ^ abs(idx - i)
+    weights <- weights / sum(weights)
+    sum(row_means[idx] * weights)
+  }, numeric(1))
+
+  baseline
+}
+
 estimate_mu_from_data <- function(sim_data, L = NULL) {
 
   ts <- sim_data$ts
@@ -13,6 +37,7 @@ estimate_mu_from_data <- function(sim_data, L = NULL) {
   }
 
   m_mu_hat <- estimate_m_mu(Z_Delta, ts)
+  baseline_m_mu <- compute_baseline_m_mu(Z_Delta)
   G_mu_hat <- estimate_G_mu(Z_Delta, m_mu_hat, m, K, h_min = h_min)
   PCs_hat <- Re(eigen(G_mu_hat)$vectors) * sqrt(m)
   lams_hat <- Re(eigen(G_mu_hat)$values) / m
@@ -27,6 +52,7 @@ estimate_mu_from_data <- function(sim_data, L = NULL) {
   return(list(
     mu_hat = mu_hat,
     m_mu_hat = m_mu_hat,
+    baseline_m_mu = baseline_m_mu,
     G_mu_hat = G_mu_hat,
     PCs_hat = PCs_hat,
     lams_hat = lams_hat,
