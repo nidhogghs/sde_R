@@ -1,6 +1,7 @@
 # real_run_sectors.R — End-to-end run on real sector data (merged/)
 # Usage:
-#   Rscript real_run_sectors.R data_dir=merged out_dir=output/real_merged k_ci=1 alpha=0.05 [max_rows=..] [max_cols=..]
+#   Rscript real_run_sectors.R data_dir=merged out_dir=output/real_merged k_ci=1 alpha=0.05 [max_rows=..]
+#       [row_start=..] [row_end=..] [max_cols=..]
 # Notes:
 #   - Assumes each CSV in data_dir has a 'date' column and stock close-price columns.
 #   - Each file is a sector (cluster). n_k = number of stock columns in that file.
@@ -24,12 +25,14 @@ suppressPackageStartupMessages({
 # ---- parse CLI args ----
 args <- commandArgs(trailingOnly = TRUE)
 par <- list(
-  data_dir = "Asm",
-  out_dir  = "output/real_Asm",
-  k_ci     = 1,
-  alpha    = 0.05,
-  max_rows = NA_integer_,
-  max_cols = NA_integer_      # 限制股票列数（不含日期列）；仅当 loader 支持时才传
+  data_dir  = "Asm",
+  out_dir   = "output/real_Asm",
+  k_ci      = 1,
+  alpha     = 0.05,
+  max_rows  = NA_integer_,
+  row_start = NA_integer_,    # 指定对齐后日期的起始行（1-based）
+  row_end   = NA_integer_,    # 指定对齐后日期的结束行（含）；缺省取到最后
+  max_cols  = NA_integer_      # 限制股票列数（不含日期列）；仅当 loader 支持时才传
 )
 for (a in args) {
   kv <- strsplit(a, "=")[[1]]
@@ -37,7 +40,7 @@ for (a in args) {
     key <- kv[1]; val <- kv[2]
     if (key %in% c("k_ci"))          par[[key]] <- as.integer(val)
     else if (key %in% c("alpha"))    par[[key]] <- as.numeric(val)
-    else if (key %in% c("max_rows","max_cols")) par[[key]] <- as.integer(val)
+    else if (key %in% c("max_rows","max_cols","row_start","row_end")) par[[key]] <- as.integer(val)
     else par[[key]] <- val
   }
 }
@@ -48,17 +51,35 @@ cat("[Start] Loading sector CSVs from: ", par$data_dir, "\n")
 if (!is.na(par$max_cols)) {
   cat(sprintf("[Info] Limiting each sector to the first %d stock columns (if supported by loader).\n", par$max_cols))
 }
+if (!is.na(par$row_start) || !is.na(par$row_end)) {
+  cat(sprintf("[Info] Selecting aligned rows from %s to %s (inclusive).\n",
+              ifelse(is.na(par$row_start), "1", par$row_start),
+              ifelse(is.na(par$row_end), "end", par$row_end)))
+  if (!is.na(par$max_rows)) {
+    warning("Both row_start/row_end and max_rows provided; row_start/row_end take precedence.")
+  }
+}
 
 # ---- build args safely depending on the loader signature ----
+loader_formals <- names(formals(load_sectors_folder_as_sim_data))
 args_loader <- list(
   data_dir = par$data_dir,
   date_col = "Date",
   assume_price_not_log = TRUE
 )
-if ("max_rows" %in% names(formals(load_sectors_folder_as_sim_data))) {
+if ("max_rows" %in% loader_formals) {
   args_loader$max_rows <- if (is.na(par$max_rows)) NULL else par$max_rows
+} else if (!is.na(par$max_rows)) {
+  warning("The loader does not support 'max_rows'; ignoring this CLI argument.")
 }
-if ("max_cols" %in% names(formals(load_sectors_folder_as_sim_data))) {
+row_args_supported <- all(c("row_start", "row_end") %in% loader_formals)
+if (row_args_supported) {
+  args_loader$row_start <- if (is.na(par$row_start)) NULL else par$row_start
+  args_loader$row_end   <- if (is.na(par$row_end))   NULL else par$row_end
+} else if (!is.na(par$row_start) || !is.na(par$row_end)) {
+  warning("The loader does not support row_start/row_end; ignoring these CLI arguments.")
+}
+if ("max_cols" %in% loader_formals) {
   args_loader$max_cols <- if (is.na(par$max_cols)) NULL else par$max_cols
 } else if (!is.na(par$max_cols)) {
   warning("The loader does not support 'max_cols'; ignoring this CLI argument.")
@@ -68,6 +89,12 @@ if ("max_cols" %in% names(formals(load_sectors_folder_as_sim_data))) {
 # cat("[DEBUG] loader formals: ", paste(names(formals(load_sectors_folder_as_sim_data)), collapse=", "), "\n")
 
 sim_data <- do.call(load_sectors_folder_as_sim_data, args_loader)
+
+if (!is.null(sim_data$aligned_dates)) {
+  date_span <- sim_data$aligned_dates
+  cat(sprintf("[Info] Final aligned trading dates: %s -> %s (%d rows after selection).\n",
+              format(date_span[1]), format(date_span[length(date_span)]), length(date_span)))
+}
 
 # quick sanity check
 K <- length(sim_data$n_vec)
