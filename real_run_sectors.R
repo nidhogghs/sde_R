@@ -139,7 +139,7 @@ if (length(sec_names) != K) sec_names <- paste0("sector_", seq_len(K))
 for (k in seq_len(K)) {
   p_k <- plot_mu_with_ci(
     ts        = sim_data$ts,
-    mu_true   = mu_res$mu_hat,  # 真实数据无真值，这里只画估计+CI
+    mu_true   = NULL,  # 真实数据无真值，这里只画估计+CI
     mu_hat    = mu_res$mu_hat,
     ci_lower  = ci$lower,
     ci_upper  = ci$upper,
@@ -158,7 +158,7 @@ pdf(file.path(par$out_dir, "mu_with_CI_all.pdf"), width = 8, height = 5)
 for (k in seq_len(K)) {
   print(plot_mu_with_ci(
     ts        = sim_data$ts,
-    mu_true   = mu_res$mu_hat,
+    mu_true   = NULL,
     mu_hat    = mu_res$mu_hat,
     ci_lower  = ci$lower,
     ci_upper  = ci$upper,

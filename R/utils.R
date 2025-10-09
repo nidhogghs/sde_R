@@ -246,26 +246,85 @@ evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval
   ))
 }
 
-plot_mu_with_ci <- function(ts, mu_true, mu_hat, ci_lower, ci_upper, k = 1) {
-  if (is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
-  if (is.vector(mu_hat)) mu_hat <- matrix(mu_hat, ncol = 1)
+# plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
+#   if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
+#   if (is.vector(mu_hat)) mu_hat <- matrix(mu_hat, ncol = 1)
+#   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
+#   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
+
+#   df <- data.frame(
+#     t = ts,
+#     Estimate = mu_hat[, k],
+#     CI_lower = ci_lower[, k],
+#     CI_upper = ci_upper[, k]
+#   )
+
+#   p <- ggplot(df, aes(x = t)) +
+#     geom_ribbon(aes(ymin = CI_lower, ymax = CI_upper), fill = "#14bddb", alpha = 0.6)
+
+#   if (!is.null(mu_true)) {
+#     df$True <- mu_true[, k]
+#     p <- p +
+#       geom_line(aes(y = True, color = "True"), linewidth = 1.1) +
+#       geom_line(aes(y = Estimate, color = "Estimate"), linewidth = 1.1, linetype = "dashed") +
+#       scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
+#       labs(color = "Type")
+#   } else {
+#     p <- p +
+#       geom_line(aes(y = Estimate), color = "red", linewidth = 1.1)
+#   }
+
+#   p +
+#     labs(title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
+#          x = "t", y = expression(mu[k](t))) +
+#     theme_minimal()
+# }
+plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
+  # 保证向量也变成列矩阵，统一索引
+  if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
+  if (is.vector(mu_hat))   mu_hat   <- matrix(mu_hat,   ncol = 1)
   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
 
-  df <- data.frame(
-    t = ts,
-    True = mu_true[, k],
-    Estimate = mu_hat[, k],
-    CI_lower = ci_lower[, k],
-    CI_upper = ci_upper[, k]
-  )
+  # 越界保护
+  ncol_mu_hat   <- ncol(mu_hat)
+  ncol_ci_lower <- ncol(ci_lower)
+  ncol_ci_upper <- ncol(ci_upper)
+  if (k < 1 || k > ncol_mu_hat || k > ncol_ci_lower || k > ncol_ci_upper) {
+    stop(sprintf("k=%d 越界：mu_hat有%d列, ci_lower有%d列, ci_upper有%d列",
+                 k, ncol_mu_hat, ncol_ci_lower, ncol_ci_upper))
+  }
+  if (!is.null(mu_true) && k > ncol(mu_true)) {
+    stop(sprintf("k=%d 越界：mu_true 只有 %d 列", k, ncol(mu_true)))
+  }
 
-  ggplot(df, aes(x = t)) +
-    geom_ribbon(aes(ymin = CI_lower, ymax = CI_upper), fill = "#14bddb", alpha = 0.6) +
-    geom_line(aes(y = True, color = "True"), linewidth = 1.1) +
-    geom_line(aes(y = Estimate, color = "Estimate"), linewidth = 1.1, linetype = "dashed") +
+  # 分层使用各自的数据帧，避免某层引用不到列
+  df_ci  <- data.frame(t = ts, CI_lower = ci_lower[, k], CI_upper = ci_upper[, k])
+  df_est <- data.frame(t = ts, Estimate = mu_hat[, k])
+
+  p <- ggplot() +
+    geom_ribbon(data = df_ci,
+                aes(x = t, ymin = CI_lower, ymax = CI_upper),
+                fill = "#14bddb", alpha = 0.6)
+
+  if (!is.null(mu_true)) {
+    df_true <- data.frame(t = ts, True = mu_true[, k])
+
+    # 分别把“真值”和“估计”作为不同数据层，并用颜色映射生成图例
+    p <- p +
+      geom_line(data = df_true, aes(x = t, y = True, color = "True"), linewidth = 1.1) +
+      geom_line(data = df_est,  aes(x = t, y = Estimate, color = "Estimate"),
+                linewidth = 1.1, linetype = "dashed") +
+      scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
+      labs(color = "Type")
+  } else {
+    # 没有真值时，不使用颜色映射，直接固定颜色
+    p <- p +
+      geom_line(data = df_est, aes(x = t, y = Estimate), color = "black", linewidth = 1.1)
+  }
+
+  p +
     labs(title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
-         x = "t", y = expression(mu[k](t)), color = "Type") +
-    scale_color_manual(values = c("True" = "black", "Estimate" = "red")) +
+         x = "t", y = expression(mu[k](t))) +
     theme_minimal()
 }

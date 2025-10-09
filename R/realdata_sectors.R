@@ -19,11 +19,14 @@
 # date_col: name of the date column (e.g., "Date" or "date")
 # assume_price_not_log: if TRUE take log() before variation()
 # max_rows / max_cols: optional throttling for light test runs
+# row_start / row_end: select a contiguous subset of aligned dates
 load_sectors_folder_as_sim_data <- function(data_dir,
                                             date_col = "date",
                                             assume_price_not_log = TRUE,
                                             max_rows = NULL,
-                                            max_cols = NULL) {
+                                            max_cols = NULL,
+                                            row_start = NULL,
+                                            row_end = NULL) {
   stopifnot(dir.exists(data_dir))
   files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
   if (length(files) == 0L) stop("No CSV files under '", data_dir, "'.")
@@ -88,7 +91,25 @@ load_sectors_folder_as_sim_data <- function(data_dir,
   common_dates <- sort(common_dates)
 
   # optional throttling by rows
-  if (!is.null(max_rows)) {
+  if (!is.null(row_start) || !is.null(row_end)) {
+    total_rows <- length(common_dates)
+    start_idx <- if (is.null(row_start)) 1L else as.integer(row_start)
+    end_idx   <- if (is.null(row_end)) total_rows else as.integer(row_end)
+    if (is.na(start_idx) || start_idx < 1L || start_idx > total_rows) {
+      stop(sprintf("row_start (%s) must be within [1, %d]", as.character(row_start), total_rows))
+    }
+    if (is.na(end_idx) || end_idx < start_idx) {
+      stop(sprintf("row_end (%s) must be >= row_start (%d)", as.character(row_end), start_idx))
+    }
+    if (end_idx > total_rows) {
+      warning(sprintf("row_end (%d) exceeds available rows (%d); using %d instead.", end_idx, total_rows, total_rows))
+      end_idx <- total_rows
+    }
+    idx <- seq.int(start_idx, end_idx)
+    common_dates <- common_dates[idx]
+    cat(sprintf("[Info] Using aligned rows %d-%d (%d dates) based on CLI selection.\n",
+                start_idx, end_idx, length(common_dates)))
+  } else if (!is.null(max_rows)) {
     if (length(common_dates) < max_rows) {
       warning("max_rows (", max_rows, ") > available rows (", length(common_dates), "). Use all.")
     } else {

@@ -39,7 +39,8 @@ par <- list(
   row_start = NA_integer_,
   row_end   = NA_integer_,
   col_start = NA_integer_,
-  col_end   = NA_integer_
+  col_end   = NA_integer_,
+  max_col   = NA_integer_     # 新增：每个分类最多保留的股票列数
 )
 
 if (length(args) > 0) {
@@ -50,7 +51,7 @@ if (length(args) > 0) {
     val <- kv[2]
     if (!nzchar(key) || !(key %in% names(par))) next
 
-    if (key %in% c("row_start", "row_end", "col_start", "col_end")) {
+    if (key %in% c("row_start", "row_end", "col_start", "col_end", "max_col")) {
       par[[key]] <- if (nzchar(val)) as.integer(val) else NA_integer_
     } else {
       par[[key]] <- val
@@ -100,6 +101,72 @@ if (!all(row_idx_used == row_idx_default)) {
   cat(sprintf("[Info] Using all ΔlogP rows (1-%d).\n", m_total))
 }
 
+# # ----- restrict columns (stock blocks) ---------------------------------------
+# orig_n_vec    <- sim_data$n_vec
+# orig_names    <- sim_data$sector_names
+# if (is.null(orig_names) || length(orig_names) != length(orig_n_vec)) {
+#   orig_names <- paste0("sector_", seq_along(orig_n_vec))
+# }
+
+# total_cols_before <- sum(orig_n_vec)
+# col_idx_default   <- c(1L, total_cols_before)
+# col_idx_used      <- col_idx_default
+
+# normalize_col_idx <- function(idx_raw, default_val, lower_bound, upper_bound) {
+#   if (is.na(idx_raw)) {
+#     return(default_val)
+#   }
+#   idx_val <- idx_raw
+#   if (idx_val < lower_bound) idx_val <- lower_bound
+#   if (idx_val > upper_bound) idx_val <- upper_bound
+#   idx_val
+# }
+
+# col_idx_used[1] <- normalize_col_idx(par$col_start, col_idx_default[1], 1L, total_cols_before)
+# col_idx_used[2] <- normalize_col_idx(par$col_end,   col_idx_default[2], 1L, total_cols_before)
+# if (col_idx_used[1] > col_idx_used[2]) {
+#   stop(sprintf("Invalid column restriction: start (%d) > end (%d) after clamping.",
+#                col_idx_used[1], col_idx_used[2]))
+# }
+
+# if (!all(col_idx_used == col_idx_default)) {
+#   keep_blocks   <- list()
+#   new_n_vec     <- integer(0)
+#   new_names     <- character(0)
+#   kept_indices  <- integer(0)
+#   col_cursor    <- 0L
+
+#   for (k in seq_along(orig_n_vec)) {
+#     block_indices <- seq.int(col_cursor + 1L, col_cursor + orig_n_vec[k])
+#     col_cursor    <- col_cursor + orig_n_vec[k]
+#     keep_global   <- block_indices[block_indices >= col_idx_used[1] &
+#                                    block_indices <= col_idx_used[2]]
+#     if (length(keep_global) == 0L) next
+#     keep_local <- keep_global - block_indices[1] + 1L
+#     keep_blocks[[length(keep_blocks) + 1L]] <-
+#       sim_data$X_Delta[, block_indices[keep_local], drop = FALSE]
+#     new_n_vec <- c(new_n_vec, length(keep_local))
+#     new_names <- c(new_names, orig_names[k])
+#     kept_indices <- c(kept_indices, keep_global)
+#   }
+
+#   if (length(keep_blocks) == 0L) {
+#     stop(sprintf("Column restriction [%d, %d] removed all stock series.",
+#                  col_idx_used[1], col_idx_used[2]))
+#   }
+
+#   sim_data$X_Delta     <- do.call(cbind, keep_blocks)
+#   sim_data$n_vec       <- new_n_vec
+#   sim_data$sector_names <- new_names
+#   col_idx_used <- c(min(kept_indices), max(kept_indices))
+
+#   cat(sprintf("[Info] Using stock columns %d-%d (global indices). Retained %d sectors / %d stocks.\n",
+#               col_idx_used[1], col_idx_used[2], length(new_n_vec), sum(new_n_vec)))
+# } else {
+#   cat(sprintf("[Info] Using all stock columns (1-%d) across %d sectors.\n",
+#               total_cols_before, length(orig_n_vec)))
+#   sim_data$sector_names <- orig_names
+# }
 # ----- restrict columns (stock blocks) ---------------------------------------
 orig_n_vec    <- sim_data$n_vec
 orig_names    <- sim_data$sector_names
@@ -108,63 +175,116 @@ if (is.null(orig_names) || length(orig_names) != length(orig_n_vec)) {
 }
 
 total_cols_before <- sum(orig_n_vec)
-col_idx_default   <- c(1L, total_cols_before)
-col_idx_used      <- col_idx_default
+col_tag <- NULL
 
-normalize_col_idx <- function(idx_raw, default_val, lower_bound, upper_bound) {
-  if (is.na(idx_raw)) {
-    return(default_val)
-  }
-  idx_val <- idx_raw
-  if (idx_val < lower_bound) idx_val <- lower_bound
-  if (idx_val > upper_bound) idx_val <- upper_bound
-  idx_val
-}
+# =============== 新增：每分类局部列号优先 ===============
+if (!is.na(par$max_col)) {
+  max_col <- as.integer(par$max_col)
+  if (max_col <= 0L) stop("max_col must be positive.")
 
-col_idx_used[1] <- normalize_col_idx(par$col_start, col_idx_default[1], 1L, total_cols_before)
-col_idx_used[2] <- normalize_col_idx(par$col_end,   col_idx_default[2], 1L, total_cols_before)
-if (col_idx_used[1] > col_idx_used[2]) {
-  stop(sprintf("Invalid column restriction: start (%d) > end (%d) after clamping.",
-               col_idx_used[1], col_idx_used[2]))
-}
-
-if (!all(col_idx_used == col_idx_default)) {
-  keep_blocks   <- list()
-  new_n_vec     <- integer(0)
-  new_names     <- character(0)
-  kept_indices  <- integer(0)
-  col_cursor    <- 0L
+  keep_blocks <- list()
+  new_n_vec   <- integer(0)
+  new_names   <- character(0)
+  col_cursor  <- 0L
+  kept_total  <- 0L
 
   for (k in seq_along(orig_n_vec)) {
-    block_indices <- seq.int(col_cursor + 1L, col_cursor + orig_n_vec[k])
-    col_cursor    <- col_cursor + orig_n_vec[k]
-    keep_global   <- block_indices[block_indices >= col_idx_used[1] &
-                                   block_indices <= col_idx_used[2]]
-    if (length(keep_global) == 0L) next
-    keep_local <- keep_global - block_indices[1] + 1L
+    nk <- orig_n_vec[k]
+    if (nk <= 0L) { 
+      col_cursor <- col_cursor + nk
+      next 
+    }
+    take_k <- min(max_col, nk)
+
+    # 该分类块在拼接矩阵中的全局范围（1-based）
+    block_start_global <- col_cursor + 1L
+    block_end_global   <- col_cursor + nk
+
+    # 在该分类内部取前 take_k 列 -> 转为全局列号
+    keep_global <- seq.int(block_start_global, block_start_global + take_k - 1L)
+
     keep_blocks[[length(keep_blocks) + 1L]] <-
-      sim_data$X_Delta[, block_indices[keep_local], drop = FALSE]
-    new_n_vec <- c(new_n_vec, length(keep_local))
+      sim_data$X_Delta[, keep_global, drop = FALSE]
+
+    new_n_vec <- c(new_n_vec, length(keep_global))
     new_names <- c(new_names, orig_names[k])
-    kept_indices <- c(kept_indices, keep_global)
+    kept_total <- kept_total + length(keep_global)
+
+    col_cursor <- col_cursor + nk
   }
 
   if (length(keep_blocks) == 0L) {
-    stop(sprintf("Column restriction [%d, %d] removed all stock series.",
+    stop("Per-sector slice removed all stock series. Check max_col value.")
+  }
+
+  sim_data$X_Delta      <- do.call(cbind, keep_blocks)
+  sim_data$n_vec        <- new_n_vec
+  sim_data$sector_names <- new_names
+
+  col_tag <- sprintf("each_1-%d", max_col)
+  cat(sprintf("[Info] Per-sector keep first %d cols -> retained %d sectors / %d stocks.\n",
+              max_col, length(new_n_vec), kept_total))
+
+} else {
+  # =============== 保留原始：全局列号 col_start/col_end ===============
+  col_idx_default <- c(1L, total_cols_before)
+  col_idx_used    <- col_idx_default
+
+  normalize_col_idx <- function(idx_raw, default_val, lower_bound, upper_bound) {
+    if (is.na(idx_raw)) return(default_val)
+    idx_val <- idx_raw
+    if (idx_val < lower_bound) idx_val <- lower_bound
+    if (idx_val > upper_bound) idx_val <- upper_bound
+    idx_val
+  }
+
+  col_idx_used[1] <- normalize_col_idx(par$col_start, col_idx_default[1], 1L, total_cols_before)
+  col_idx_used[2] <- normalize_col_idx(par$col_end,   col_idx_default[2], 1L, total_cols_before)
+  if (col_idx_used[1] > col_idx_used[2]) {
+    stop(sprintf("Invalid column restriction: start (%d) > end (%d) after clamping.",
                  col_idx_used[1], col_idx_used[2]))
   }
 
-  sim_data$X_Delta     <- do.call(cbind, keep_blocks)
-  sim_data$n_vec       <- new_n_vec
-  sim_data$sector_names <- new_names
-  col_idx_used <- c(min(kept_indices), max(kept_indices))
+  if (!all(col_idx_used == col_idx_default)) {
+    keep_blocks   <- list()
+    new_n_vec     <- integer(0)
+    new_names     <- character(0)
+    kept_indices  <- integer(0)
+    col_cursor    <- 0L
 
-  cat(sprintf("[Info] Using stock columns %d-%d (global indices). Retained %d sectors / %d stocks.\n",
-              col_idx_used[1], col_idx_used[2], length(new_n_vec), sum(new_n_vec)))
-} else {
-  cat(sprintf("[Info] Using all stock columns (1-%d) across %d sectors.\n",
-              total_cols_before, length(orig_n_vec)))
-  sim_data$sector_names <- orig_names
+    for (k in seq_along(orig_n_vec)) {
+      block_indices <- seq.int(col_cursor + 1L, col_cursor + orig_n_vec[k])
+      col_cursor    <- col_cursor + orig_n_vec[k]
+      keep_global   <- block_indices[block_indices >= col_idx_used[1] &
+                                     block_indices <= col_idx_used[2]]
+      if (length(keep_global) == 0L) next
+      keep_local <- keep_global - block_indices[1] + 1L
+      keep_blocks[[length(keep_blocks) + 1L]] <-
+        sim_data$X_Delta[, block_indices[keep_local], drop = FALSE]
+      new_n_vec <- c(new_n_vec, length(keep_local))
+      new_names <- c(new_names, orig_names[k])
+      kept_indices <- c(kept_indices, keep_global)
+    }
+
+    if (length(keep_blocks) == 0L) {
+      stop(sprintf("Column restriction [%d, %d] removed all stock series.",
+                   col_idx_used[1], col_idx_used[2]))
+    }
+
+    sim_data$X_Delta      <- do.call(cbind, keep_blocks)
+    sim_data$n_vec        <- new_n_vec
+    sim_data$sector_names <- new_names
+    col_idx_used <- c(min(kept_indices), max(kept_indices))
+
+    col_tag <- sprintf("%d-%d", col_idx_used[1], col_idx_used[2])
+    cat(sprintf("[Info] Using stock columns %s (global indices). Retained %d sectors / %d stocks.\n",
+                col_tag, length(new_n_vec), sum(new_n_vec)))
+  } else {
+    cat(sprintf("[Info] Using all stock columns (1-%d) across %d sectors.\n",
+                total_cols_before, length(orig_n_vec)))
+    sim_data$sector_names <- orig_names
+    col_tag <- sprintf("1-%d", total_cols_before)
+  }
 }
 
 # ----- compute sector means ---------------------------------------------------
@@ -183,10 +303,12 @@ row_tag <- if (all(row_idx_used == row_idx_default)) {
 } else {
   sprintf("%d-%d", row_idx_used[1], row_idx_used[2])
 }
-col_tag <- if (all(col_idx_used == col_idx_default)) {
-  sprintf("1-%d", col_idx_default[2])
-} else {
-  sprintf("%d-%d", col_idx_used[1], col_idx_used[2])
+if (!exists("col_tag") || is.null(col_tag)) {
+  col_tag <- if (all(col_idx_used == col_idx_default)) {
+    sprintf("1-%d", col_idx_default[2])
+  } else {
+    sprintf("%d-%d", col_idx_used[1], col_idx_used[2])
+  }
 }
 
 csv_path <- file.path(par$out_dir,

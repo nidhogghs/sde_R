@@ -40,6 +40,7 @@ construct_Y <- function(Z_Delta, n_vec, q_vec) {
     Z_k <- Z_Delta[, idx_range, drop = FALSE]
 
     Z_sq_sum <- rowSums(Z_k^2)
+    Z_sq_sum <- pmax(Z_sq_sum, .Machine$double.eps)
     Y_k <- log(Z_sq_sum) - log(n_vec[k]) - q_vec[k]  # 用第 k 个 q_k
 
     Y_Delta[, k] <- Y_k
