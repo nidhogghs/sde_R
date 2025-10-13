@@ -333,14 +333,38 @@ cat("[Plot] Saved facet overview: mu_centered_facets.png\n")
 # ====== Visualize m_mu_hat & Raw vs Centered ======
 cat("[Step] Visualizing m_mu_hat and raw vs centered comparisons ...\n")
 df_mmu <- data.frame(t = sim_data$ts, m_mu = as.numeric(mu_res$m_mu_hat))
+# p_mmu <- ggplot(df_mmu, aes(x = t, y = m_mu)) +
+#   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.4) +
+#   geom_line(linewidth = 1) +
+#   labs(title = expression(paste("Estimated overall mean ", m[mu], "(t)")),
+#        x = "t", y = expression(m[mu](t))) +
+#   theme_minimal()
+# ggsave(file.path(par$out_dir, "m_mu_hat.png"),
+#        plot = p_mmu, width = 8, height = 4.5, dpi = 150)
 p_mmu <- ggplot(df_mmu, aes(x = t, y = m_mu)) +
   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.4) +
   geom_line(linewidth = 1) +
-  labs(title = expression(paste("Estimated overall mean ", m[mu], "(t)")),
-       x = "t", y = expression(m[mu](t))) +
-  theme_minimal()
-ggsave(file.path(par$out_dir, "m_mu_hat.png"),
-       plot = p_mmu, width = 8, height = 4.5, dpi = 150)
+  labs(
+    title = expression(paste("Estimated overall mean ", m[mu], "(t)")),
+    x = "t",
+    y = expression(m[mu](t))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold"),  # 横轴标题字号与加粗
+    axis.title.y = element_text(size = 16, face = "bold"),  # 纵轴标题字号与加粗
+    axis.text.x  = element_text(size = 13),                 # 横轴数字刻度字号
+    axis.text.y  = element_text(size = 13),                 # 纵轴数字刻度字号
+    plot.title   = element_text(size = 18, face = "bold", hjust = 0.5)  # 图标题居中加粗
+  )
+
+ggsave(
+  file.path(par$out_dir, "m_mu_hat.png"),
+  plot = p_mmu,
+  width = 8,
+  height = 4.5,
+  dpi = 150
+)
 
 k_show <- par$k_ci
 if (k_show < 1 || k_show > ncol(mu_res$mu_hat)) k_show <- 1

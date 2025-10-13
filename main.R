@@ -17,7 +17,7 @@ library(reshape2)                # 数据长宽转换
 # ======= Step 1: 模拟数据 =======
 sim_data <- prepare_simulation_data(
   K = 500,           # 过程个数
-  n_ave = 300,       # 每个过程的子样本数
+  n_ave = 30,       # 每个过程的子样本数
   m = 50,            # 时间网格数
   k = 4,
   l = 4,              # μ 的主成分个数（真实结构）
