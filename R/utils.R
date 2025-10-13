@@ -67,16 +67,16 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 20) {
   m <- nrow(Z_Delta)  # 时间点数
   aic_values <- numeric(max_L)  # 储存各个 L 值对应的 AIC
     # 设置惩罚强度 penalty
-   penalty <- 0.0000055 
-  # penalty <- if (K < 50) {
-  #   0.001
-  # } else if (K < 200) {
-  #   0.5
-  # } else if (K < 500) {
-  #   1
-  # } else {
-  #   2
-  # }
+  #  penalty <- 0.0000055 
+  penalty <- if (K < 50) {
+    0.001
+  } else if (K < 200) {
+    0.5
+  } else if (K < 500) {
+    1
+  } else {
+    2
+  }
   for (L in 1:max_L) {
     Z_hat <- matrix(0, m, K)  # 重构的 Z 值
     for (i in 1:K) {
@@ -163,6 +163,26 @@ select_L_by_AIC <- function(Z_Delta, m_mu, PCs, max_L = 20) {
 #   return(L_opt)
 # }
 
+#彩印原版
+# plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
+#   if (is.vector(true_mat)) true_mat <- matrix(true_mat, ncol = 1)
+#   if (is.vector(est_mat))  est_mat  <- matrix(est_mat,  ncol = 1)
+
+#   df <- data.frame(
+#     t = ts,
+#     True = true_mat[, k],
+#     Estimate = est_mat[, k]
+#   )
+#   df_melt <- reshape2::melt(df, id.vars = "t", variable.name = "Type", value.name = "Value")
+
+#   p <- ggplot(df_melt, aes(x = t, y = Value, color = Type)) +
+#     geom_line(linewidth = 1) +
+#     labs(title = sprintf("Comparison of %s: True vs Estimated (k = %d)", label, k),
+#          x = "t", y = label) +
+#     theme_minimal()
+
+#   return(p)  # 显示图像
+# }
 
 plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
   if (is.vector(true_mat)) true_mat <- matrix(true_mat, ncol = 1)
@@ -175,14 +195,27 @@ plot_compare_single <- function(ts, true_mat, est_mat, k, label = "V") {
   )
   df_melt <- reshape2::melt(df, id.vars = "t", variable.name = "Type", value.name = "Value")
 
-  p <- ggplot(df_melt, aes(x = t, y = Value, color = Type)) +
-    geom_line(linewidth = 1) +
-    labs(title = sprintf("Comparison of %s: True vs Estimated (k = %d)", label, k),
-         x = "t", y = label) +
-    theme_minimal()
+  # —— 黑白期刊友好：仅用线型区分，颜色统一为黑色；去掉子图标题 ——
+  p <- ggplot(df_melt, aes(x = t, y = Value, linetype = Type)) +
+    geom_line(linewidth = 1, color = "black") +
+    scale_linetype_manual(
+      name = "Legend",
+      values = c("True" = "solid", "Estimate" = "longdash")
+    ) +
+    labs(x = "t", y = label) +
+    theme_bw(base_size = 13) +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      plot.title = element_blank()  # 取消小标题
+    )
 
-  return(p)  # 显示图像
+  return(p)
 }
+
+
+
 
 # 计算 q0 的值
 # 计算每个 n_k 对应的 q_k，支持向量输入
@@ -329,7 +362,6 @@ evaluate_V_estimation <- function(V_true, V_hat, sigma2_true, sigma2_hat, k_eval
 #          x = "t", y = expression(mu[k](t))) +
 #     theme_minimal()
 # }
-
 plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
   # —— 输入整理：确保按列处理（不影响接口）——
   if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
@@ -337,7 +369,7 @@ plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 
   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
 
-  # —— 越界保护（报错信息保留中文，不出现在图里）——
+  # —— 越界保护 —— 
   ncol_mu_hat   <- ncol(mu_hat)
   ncol_ci_lower <- ncol(ci_lower)
   ncol_ci_upper <- ncol(ci_upper)
@@ -353,68 +385,151 @@ plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 
   df_ci  <- data.frame(t = ts, CI_lower = ci_lower[, k], CI_upper = ci_upper[, k])
   df_est <- data.frame(t = ts, Estimate = mu_hat[, k])
 
-  # —— 基底图：让 ribbon 进入图例（英文标签）——
+  # —— 基底图：灰色置信带（黑白友好），进入图例 —— 
   p <- ggplot() +
     geom_ribbon(
       data = df_ci,
       aes(x = t, ymin = CI_lower, ymax = CI_upper, fill = "95% CI"),
-      alpha = 0.25, colour = NA
+      alpha = 0.3, colour = NA
     )
 
-  # —— 线条图层：颜色 + 线型同时区分，进入同一英文图例 —— 
+  # —— 线条层：仅用线型区分，颜色统一黑色 —— 
   if (!is.null(mu_true)) {
     df_true <- data.frame(t = ts, True = mu_true[, k])
     p <- p +
       geom_line(
         data = df_true,
-        aes(x = t, y = True, color = "True", linetype = "True"),
-        linewidth = 1.05
+        aes(x = t, y = True, linetype = "True"),
+        color = "black", linewidth = 1.05
       ) +
       geom_line(
         data = df_est,
-        aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
-        linewidth = 1.05
+        aes(x = t, y = Estimate, linetype = "Estimate"),
+        color = "black", linewidth = 1.05
       )
   } else {
     p <- p +
       geom_line(
         data = df_est,
-        aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
-        linewidth = 1.05
+        aes(x = t, y = Estimate, linetype = "Estimate"),
+        color = "black", linewidth = 1.05
       )
   }
 
-  # —— 手动样式（全英文）：合并 fill/color/linetype 为一个图例 —— 
+  # —— 手动样式：统一图例标题，线型区分曲线，灰度区分置信带 —— 
   p <- p +
     scale_fill_manual(
       name = "Legend",
-      values = c("95% CI" = "#14bddb")
-    ) +
-    scale_color_manual(
-      name = "Legend",
-      values = c("True" = "black", "Estimate" = "#d61c1cff")
+      values = c("95% CI" = "grey75")
     ) +
     scale_linetype_manual(
       name = "Legend",
-      values = c("True" = "solid", "Estimate" = "solid")
+      values = c("True" = "solid", "Estimate" = "longdash")
     ) +
     guides(
-      fill = guide_legend(order = 1, override.aes = list(alpha = 0.25)),
-      color = guide_legend(order = 2),
+      fill = guide_legend(order = 1, override.aes = list(alpha = 0.3)),
       linetype = guide_legend(order = 2)
     ) +
     labs(
-      title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
-      x = "t", 
-      y = expression(mu[k](t))
+      x = "t",
+      y = expression(mu[i](t))
     ) +
     theme_bw(base_size = 13) +
     theme(
       legend.position = "right",
       legend.title = element_text(face = "bold"),
       panel.grid.minor = element_blank(),
-      plot.title = element_text(hjust = 0.5)
+      plot.title = element_blank()  # 取消小标题
     )
 
   p
 }
+
+# plot_mu_with_ci <- function(ts, mu_true = NULL, mu_hat, ci_lower, ci_upper, k = 1) {
+#   # —— 输入整理：确保按列处理（不影响接口）——
+#   if (!is.null(mu_true) && is.vector(mu_true)) mu_true <- matrix(mu_true, ncol = 1)
+#   if (is.vector(mu_hat))   mu_hat   <- matrix(mu_hat,   ncol = 1)
+#   if (is.vector(ci_lower)) ci_lower <- matrix(ci_lower, ncol = 1)
+#   if (is.vector(ci_upper)) ci_upper <- matrix(ci_upper, ncol = 1)
+
+#   # —— 越界保护（报错信息保留中文，不出现在图里）——
+#   ncol_mu_hat   <- ncol(mu_hat)
+#   ncol_ci_lower <- ncol(ci_lower)
+#   ncol_ci_upper <- ncol(ci_upper)
+#   if (k < 1 || k > ncol_mu_hat || k > ncol_ci_lower || k > ncol_ci_upper) {
+#     stop(sprintf("k=%d 越界：mu_hat有%d列, ci_lower有%d列, ci_upper有%d列",
+#                  k, ncol_mu_hat, ncol_ci_lower, ncol_ci_upper))
+#   }
+#   if (!is.null(mu_true) && k > ncol(mu_true)) {
+#     stop(sprintf("k=%d 越界：mu_true 只有 %d 列", k, ncol(mu_true)))
+#   }
+
+#   # —— 分层数据帧 —— 
+#   df_ci  <- data.frame(t = ts, CI_lower = ci_lower[, k], CI_upper = ci_upper[, k])
+#   df_est <- data.frame(t = ts, Estimate = mu_hat[, k])
+
+#   # —— 基底图：让 ribbon 进入图例（英文标签）——
+#   p <- ggplot() +
+#     geom_ribbon(
+#       data = df_ci,
+#       aes(x = t, ymin = CI_lower, ymax = CI_upper, fill = "95% CI"),
+#       alpha = 0.25, colour = NA
+#     )
+
+#   # —— 线条图层：颜色 + 线型同时区分，进入同一英文图例 —— 
+#   if (!is.null(mu_true)) {
+#     df_true <- data.frame(t = ts, True = mu_true[, k])
+#     p <- p +
+#       geom_line(
+#         data = df_true,
+#         aes(x = t, y = True, color = "True", linetype = "True"),
+#         linewidth = 1.05
+#       ) +
+#       geom_line(
+#         data = df_est,
+#         aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
+#         linewidth = 1.05
+#       )
+#   } else {
+#     p <- p +
+#       geom_line(
+#         data = df_est,
+#         aes(x = t, y = Estimate, color = "Estimate", linetype = "Estimate"),
+#         linewidth = 1.05
+#       )
+#   }
+
+#   # —— 手动样式（全英文）：合并 fill/color/linetype 为一个图例 —— 
+#   p <- p +
+#     scale_fill_manual(
+#       name = "Legend",
+#       values = c("95% CI" = "#77a3aaff")
+#     ) +
+#     scale_color_manual(
+#       name = "Legend",
+#       values = c("True" = "black", "Estimate" = "#000000ff")
+#     ) +
+#     scale_linetype_manual(
+#       name = "Legend",
+#       values = c("True" = "solid", "Estimate" = "solid")
+#     ) +
+#     guides(
+#       fill = guide_legend(order = 1, override.aes = list(alpha = 0.25)),
+#       color = guide_legend(order = 2),
+#       linetype = guide_legend(order = 2)
+#     ) +
+#     labs(
+#       # title = sprintf("Estimated μ_k(t) with 95%% CI (k = %d)", k),
+#       x = "t", 
+#       y = expression(mu[k](t))
+#     ) +
+#     theme_bw(base_size = 13) +
+#     theme(
+#       legend.position = "right",
+#       legend.title = element_text(face = "bold"),
+#       panel.grid.minor = element_blank(),
+#       plot.title = element_text(hjust = 0.5)
+#     )
+
+#   p
+# }

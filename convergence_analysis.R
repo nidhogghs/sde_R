@@ -183,8 +183,10 @@ mu_plot_long <- melt(mu_plot_df, id.vars = c("index", "time", "n_ave"),
 p2 <- ggplot(mu_plot_long, aes(x = time, y = mu, color = Method)) +
   geom_line() +
   facet_wrap(~ n_ave, ncol = 2, labeller = label_both) +
-  labs(title = sprintf("True vs Estimates (N=%d, seed=1, n=1)", K),
-       x = "Time", y = "mu") +
+  # labs(title = sprintf("True vs Estimates (N=%d, seed=1, n=1)", K),
+  #      x = "Time", y = "mu") +
+   labs(
+        x = "Time", y = "mu") +
   theme_minimal()
 ggsave("mu_compare_traditional.png", p2, width = 8, height = 6)
 
@@ -193,8 +195,10 @@ if (length(eigenfun_store) > 0) {
   p3 <- ggplot(eigenfun_df, aes(x = time, y = value, color = Method, linetype = Method)) +
     geom_line() +
     facet_grid(component ~ n_ave, labeller = label_both) +
+    # labs(title = sprintf("Leading eigenfunctions of G_mu (N=%d, seed=1)", K),
+    #      x = "Time", y = "Eigenfunction value") +
     labs(title = sprintf("Leading eigenfunctions of G_mu (N=%d, seed=1)", K),
-         x = "Time", y = "Eigenfunction value") +
+        x = "Time", y = "Eigenfunction value") +
     theme_minimal()
 
   ggsave("G_mu_eigenfunctions.png", p3, width = 10, height = 6)
@@ -207,6 +211,9 @@ if (length(eigenval_store) > 0) {
     geom_point() +
     facet_wrap(~ n_ave, labeller = label_both) +
     scale_x_continuous(breaks = unique(eigenval_df$component)) +
+    # labs(title = sprintf("Leading eigenvalues of G_mu (N=%d, seed=1)", K),
+    #      x = "Component", y = "Eigenvalue") +
+    # theme_minimal()
     labs(title = sprintf("Leading eigenvalues of G_mu (N=%d, seed=1)", K),
          x = "Component", y = "Eigenvalue") +
     theme_minimal()

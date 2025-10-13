@@ -36,16 +36,28 @@ sigma_res <- inference_sigma_from_data(sim_data)
 
 # ======= Step 4: 可视化第 k 条曲线的估计效果 =======
 
-# 绘制 μ_k(t) 与 σ²_k(t) 的真实值与估计值对比图
-#展示第k_show个过程
+# ==============================
+# 可运行版：单独展示并保存所有图
+# ==============================
+
+# 创建输出目录（若不存在则创建）
+if (!dir.exists("output")) dir.create("output", recursive = TRUE)
+
+# --- 绘制 μ_k(t) 与 σ²_k(t) ---
 k_show <- 1
-p_mu <- plot_compare_single(sim_data$ts, sim_data$mu_true, mu_res$mu_hat, k = k_show, label = "mu_k(t)")
-p_sigma <- plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma_res$sigma2_hat, k = k_show, label = "sigma²_k(t)")
+p_mu <- plot_compare_single(sim_data$ts, sim_data$mu_true, mu_res$mu_hat,
+                            k = k_show, label = "mu_i(t)")
+p_sigma <- plot_compare_single(sim_data$ts, sim_data$sigma2_true, sigma_res$sigma2_hat,
+                               k = k_show, label = "sigma²_i(t)")
 
-# 并排展示两个图
-# grid.arrange(p_mu, p_sigma, ncol = 2)
+# 展示并保存
+print(p_mu)
+ggsave(sprintf("output/mu_k%d.png", k_show), p_mu, width = 6, height = 4, dpi = 300)
 
-# 计算置信区间
+print(p_sigma)
+ggsave(sprintf("output/sigma2_k%d.png", k_show), p_sigma, width = 6, height = 4, dpi = 300)
+
+# --- 计算置信区间 ---
 ci_mu <- compute_mu_ci(
   mu_hat = mu_res$mu_hat,
   PCs = mu_res$PCs_hat,
@@ -55,7 +67,7 @@ ci_mu <- compute_mu_ci(
   alpha = 0.05,
   L = mu_res$L
 )
-# 绘图
+
 p_ci <- plot_mu_with_ci(
   ts = sim_data$ts,
   mu_true = sim_data$mu_true,
@@ -64,45 +76,103 @@ p_ci <- plot_mu_with_ci(
   ci_upper = ci_mu$upper,
   k = k_show
 )
-grid.arrange(p_mu, p_sigma, p_ci, ncol = 3)
+print(p_ci)
+ggsave(sprintf("output/mu_ci_k%d.png", k_show), p_ci, width = 6, height = 4, dpi = 300)
 
-
-
+# --- 传统估计法 ---
 mu_hat_traditional <- estimate_mu_traditional_from_data(sim_data)
 res_traditional <- evaluate_traditional_mu_estimation(sim_data, mu_hat_traditional, show_plot_k = k_show)
-
-# 组合 True / FDA / Traditional 三种估计进行对比
+# --- 三方法对比（黑白线型区分） ---
+#（保持 df_mu_methods_long 不变）
+# 为了图例顺序稳定：True -> FDA -> Traditional
 df_mu_methods <- data.frame(
   t = sim_data$ts,
   True = sim_data$mu_true[, k_show],
   FDA = mu_res$mu_hat[, k_show],
   Traditional = mu_hat_traditional[, k_show]
 )
-df_mu_methods_long <- reshape2::melt(df_mu_methods, id.vars = "t",
-                                     variable.name = "Method", value.name = "Value")
-p_mu_methods <- ggplot(df_mu_methods_long, aes(x = t, y = Value, color = Method)) +
-  geom_line(linewidth = 1) +
-  labs(title = sprintf("Comparison of mu_k(t) Estimates (k = %d)", k_show),
-       x = "t", y = "mu_k(t)") +
-  theme_minimal()
+df_mu_methods_long <- melt(df_mu_methods, id.vars = "t",
+                           variable.name = "Method", value.name = "Value")
+df_mu_methods_long$Method <- factor(df_mu_methods_long$Method,
+                                    levels = c("True", "FDA", "Traditional"))
 
-# # ======= End of main.R =======
-# ===== Visualize and compare m_mu(t) =====
-m_mu_true <- rowMeans(sim_data$mu_true)       # true mean function
-m_mu_hat  <- mu_res$m_mu_hat                  # estimated mean
+p_mu_methods <- ggplot(df_mu_methods_long, aes(x = t, y = Value, linetype = Method)) +
+  geom_line(linewidth = 1, color = "black") +
+  scale_linetype_manual(
+    name = "Legend",
+    values = c("True" = "solid", "FDA" = "longdash", "Traditional" = "dotdash")
+  ) +
+  labs(x = "t", y = expression(mu[i](t))) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_blank()  # 去掉标题
+  )
+
+print(p_mu_methods)
+ggsave(sprintf("output/mu_methods_i%d.png", k_show), p_mu_methods, width = 6, height = 4, dpi = 300)
+
+# p_mu_methods <- ggplot(df_mu_methods_long, aes(x = t, y = Value, color = Method)) +
+#   geom_line(linewidth = 1) +
+#   labs(title = sprintf("Comparison of mu_k(t) Estimates (k = %d)", k_show),
+#        x = "t", y = "mu_k(t)") +
+#   theme_minimal()
+
+# print(p_mu_methods)
+# ggsave(sprintf("output/mu_methods_k%d.png", k_show), p_mu_methods, width = 6, height = 4, dpi = 300)
+
+# --- Population mean m_mu(t) ---
+m_mu_true <- rowMeans(sim_data$mu_true)
+m_mu_hat  <- mu_res$m_mu_hat
 
 df_m_mu <- data.frame(
   t = sim_data$ts,
   True = m_mu_true,
   Estimated = m_mu_hat
 )
-df_m_mu_long <- reshape2::melt(df_m_mu, id.vars = "t",
-                               variable.name = "Type", value.name = "Value")
+df_m_mu_long <- melt(df_m_mu, id.vars = "t",
+                     variable.name = "Type", value.name = "Value")
 
-p_m_mu <- ggplot(df_m_mu_long, aes(x = t, y = Value, color = Type)) +
-  geom_line(linewidth = 1) +
-  labs(title = "Comparison of m_mu(t): True vs Estimated",
-       x = "t", y = "m_mu(t)") +
-  theme_minimal()
+# p_m_mu <- ggplot(df_m_mu_long, aes(x = t, y = Value, color = Type)) +
+#   geom_line(linewidth = 1) +
+#   labs(title = "Comparison of m_mu(t): True vs Estimated",
+#        x = "t", y = "m_mu(t)") +
+#   theme_minimal()
 
-grid.arrange(  p_ci, p_m_mu, ncol = 2)
+# print(p_m_mu)
+# ggsave("output/m_mu_comparison.png", p_m_mu, width = 6, height = 4, dpi = 300)
+# --- Population mean m_mu(t)（黑白线型区分） ---
+#（保持 df_m_mu_long 不变）
+# 统一顺序：True -> Estimated
+df_m_mu_long$Type <- factor(df_m_mu_long$Type, levels = c("True", "Estimated"))
+
+p_m_mu <- ggplot(df_m_mu_long, aes(x = t, y = Value, linetype = Type)) +
+  geom_line(linewidth = 1, color = "black") +
+  scale_linetype_manual(
+    name = "Legend",
+    values = c("True" = "solid", "Estimated" = "longdash")
+  ) +
+  labs(x = "t", y = expression(m[mu](t))) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_blank()  # 去掉标题
+  )
+
+print(p_m_mu)
+ggsave("output/m_mu_comparison.png", p_m_mu, width = 6, height = 4, dpi = 300)
+
+# --- 同时生成一个多页 PDF ---
+pdf("output/all_plots.pdf", width = 7, height = 5)
+print(p_mu)
+print(p_sigma)
+print(p_ci)
+print(p_mu_methods)
+print(p_m_mu)
+dev.off()
+
+cat("[Saved] 所有图像已输出至 output/ 目录下\n")
